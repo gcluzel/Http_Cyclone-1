@@ -156,19 +156,72 @@ detect possible runtime errors and violations of functional contracts.
 
 \subsection{Interfacing SPARK and C Code}
 
-describe import of C subprograms/export of SPARK subprograms, and how data
-types are mapped, also contracts on imported subprograms
+    To reduce the size of the work, only few functions have been totaly translated
+    in SPARK. Then, some C functions are reused in SPARK, and some SPARK functions
+    are exported to be used in C code. The only constraint is that the
+    declarations of both the SPARK and the C functions must match.
+    The attribute \lstinline{Import} can be added to the declaration of a
+    subprogram in SPARK to specify to the compiler that the function is defined
+    in C. Symmetrically, the attribute \lstinline{Export} allows the subprogram
+    to be reused in C. An \lstinline{External_Name} might be given for the
+    programmers and the linker to locate the right symbol at the liking time.
+
+
+    The types in SPARK can be more expressive than the ones used in C. However
+    they must have the same representation in memory to be used as an argument
+    of a function. The attribute \lstinline{Size} can be added to SPARK types
+    to keep them coherent with the C types. It specifies to the compiler the
+    size in bits requiered to store an object of this type.
+
+    In addition, contracts can be added on imported subprograms. In this case,
+    SPARK use their contracts to analyze other subprograms that call these imported
+    subprograms, but their contracts are not proved. It is the responsability of the
+    user to ensure that the contract he writes is correct.
 
 \subsection{Dealing with Pointers}
 
-both at top-level and as fields in structures. explain how it relies on the
-ownership model. maybe a little bit on dynamic allocation/deallocation (which
-will introduce the section later on memory leaks)
+    In CycloneTCP library, pointers are often manupulated at top-level and
+    transmitted to C functions.  They are also used as fields in structures,
+    for instance in the socket structure to store other complex data-structures
+    and recursive pointer based data-structures.
+    SPARK use a pointer ownership model to prevent bugs involving pointers such
+    as memory leak or double free. When memory is allocated, the pointer pointed
+    to this memory area is owned. The ownership of this memory can be moved.
+    The memory must be deallocated before the end of the execution fo the program,
+    and a pointer has to be owned at every point of the program.
+
+% both at top-level and as fields in structures. explain how it relies on the
+% ownership model. maybe a little bit on dynamic allocation/deallocation (which
+% will introduce the section later on memory leaks)
 
 \subsection{Specifying the Frame Condition}
 
-describe how models of sockets are defined and used in contracts, based on
-ghost code, delta aggregates and Old attribute
+    The socket structure is modified through the TCP user functions. In particular
+    the state of the socket that we are interested in is modified and we want to
+    track these modifications. But a lot of fields of the socket structure are not
+    interesting to prove the correctness of the states transitions. Then, it is
+    necessary to create a model of the socket to describe the revelant field of
+    the socket to keep. Two models have been created, the first \lstinline{Model}
+    that tracks the TCP state of the socket as well as basic fields of the socket,
+    and the second \lstinline{Basic_Model} that only tracks the basic fields and
+    loss all information about the TCP state.
+
+    The post-conditions use these models in such way
+    \begin{lstlisting}[language=Ada]
+    Model(Sock) = (Model(Sock)'Old with delta
+                        State => TCP_STATE_CLOSED)
+    \end{lstlisting}
+    where the \lstinline{Old} in \lstinline{Model(Sock)'Old} refers to the model
+    of the socket before the call of the function, and \lstinline{with delta} is
+    a delta aggregates that yield a copy of the old model with a new value for
+    the field \lstinline{State} modified.
+
+    The models used in contracts are based on ghost code. The ghost code is only
+    used for the proofs with GNATprove, and is removed by the compiler. Thus, the size
+    of the code does not increase by adding contracts.
+
+    % describe how models of sockets are defined and used in contracts, based on
+    % ghost code, delta aggregates and Old attribute
 
 
 \section{Verification of the TCP protocol and the Socket API}
