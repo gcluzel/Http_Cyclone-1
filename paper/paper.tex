@@ -3,7 +3,16 @@
 \usepackage{listings}
 \usepackage[colorlinks]{hyperref}
 
-\usepackage{xcolor}
+\ifLuaTeX
+    \usepackage{fontspec}
+    \IfFontExistsTF{Fira Code}
+    {\setmonofont[Scale=MatchLowercase]{Fira Code}}
+    {\IfFontExistsTF{DejaVu Sans Mono}{
+        \setmonofont{DejaVu Sans Mono}[Scale=MatchLowercase]
+    }{}}
+\fi
+
+\usepackage[x11names]{xcolor}
 
 \usepackage[ruled]{algorithm2e}
 \usepackage{amsmath,amsfonts}
@@ -12,11 +21,42 @@
 
 \lstset{
     basicstyle=\fontsize{9}{9}\selectfont\ttfamily,
-    keywordstyle=\color{blue!50}\bfseries
+    keywordstyle={[1]\color{Blue4}\bfseries}, % keywords style
+    keywordstyle={[2]\color{Pink4}}, % type style
+    keywordstyle={[3]\color{OrangeRed3}}, % function style
+    literate =
+        {=>}{{=>}}2
+        {/=}{{/=}}2,
+    commentstyle=\itshape\color{gray}
 }
+
+\lstdefinestyle{C}{
+    language = C,
+    classoffset = 1,
+    morekeywords = {Socket, IpAddr, uint_t, uint16_t, error_t},
+    classoffset = 2,
+    morekeywords = {socketOpen, socketConnect},
+    classoffset = 0
+}
+
+\lstdefinestyle{Spark}{
+    language = Ada,
+    classoffset = 1,
+    morekeywords = {Socket_Struct, Socket, Not_Null_Socket, Socket_Type, Socket_Prot, IpAddr, Error_T, Port},
+    classoffset = 2,
+    morekeywords = {Socket_Open, Socket_Connect, Socket_Send},
+    classoffset = 7,
+    morekeywords = {Pre, Post},
+    keywordstyle = \bfseries,
+    classoffset = 0,
+}
+
+\let\state\textsf
+\let\flag\textsf
 
 \usepackage{tikz}
 \usetikzlibrary{decorations.pathreplacing, patterns}
+\usetikzlibrary{calc, backgrounds}
 
 \usepackage{subcaption}
 
@@ -78,39 +118,85 @@
 
 \subsection{TCP protocol}
 
-    %\input{Automaton.tex}
+The TCP protocol is one of the most used protocol on the Internet.
+It is connection-oriented in the sense that a connection requires to be
+established between the two processes that exchange data. The protocol is
+governed by a state machine described in figure~\ref{Fig:statemachine}.
+The whole description of the protocol can be found in RFC~793~\cite{rfc793}.
+Its implementation is rather free and lots of choices are left to the programmer.
+However, the implementation must ensure some properties to be able to communicate
+with other TCPs.
+We present here the main elements that are useful for our verification.
 
-In this part we should present:
-\begin{itemize}
-    \item The TCP protocol
-    \begin{itemize}
-        \item Different states
-        \item Flags that can be received (mainly SYN, ACK, FIN \& RST)
-        \item State machine
-        \item User functions
-        \item Precise that most of transitions are done when a message is received and then, outside of the user functions.
-    \end{itemize}
-\end{itemize}
+\input{Automaton.tex}
+
+\subsubsection{States}
+
+In this automaton, the states represent the state of the connection. \state{CLOSED}
+stands for a closed connection. Both states \state{SYN-SENT} and \state{SYN-RCVD} denotes
+the states that a TCP process can take during the initiation  of a new connection. The state
+\state{ESTABLISHED} represent the state when the connection is established. Then, two groups
+of states can be distinguished: the group formed by \state{FIN\_WAIT\_1}, \state{FIN\_WAIT\_2},
+\state{CLOSING} and \state{TIME\_WAIT} and that represents the states that a TCP can take
+when it is closing its connection and it is at the origin of the closing; and the group formed
+by the states \state{CLOSE\_WAIT} and \state{LAST\_ACK} when the connection is closing
+and the closing was initiated by the remote TCP.
+Finally, the state \state{LISTEN} stands for a TCP that waits for an incoming connection.
+
+\subsubsection{Flags}
+
+The transitions between the states are dictated by three things: user actions, the reception
+of flags and timers. When a transition is triggered, a response is given by sending of flags.
+The user actions, written in italic in the automaton, can be an active or
+passive opening, or a close. The corresponding functions are detailed in the next paragraph.
+The main flags that can be sent appear in figure~\ref{Fig:statemachine}. They are sent
+alongside TCP segments, in the header.
+\flag{SYN} is sent to synchronize two TCPs when they want to initiate a connection.
+The \flag{ACK} flag confirms the reception of a previous message. \flag{FIN} indicates that
+the TCP server wants to close the connection. Finally, a flag named \flag{RST} can be sent or
+received at any instant and it forces the connection to be reset.
+If so, Both TCPs jump to the state \state{CLOSED}.
+The transition are represented in figure~\ref{Fig:statemachine} in the format
+$\frac{\ \ x\ \ }{\ \ y\ \ }$ where $x$ is the event that triggers the transition and $y$ is
+the response given to fulfil the transition.
+For instance, if the TCP is in the state \state{SYN\_SENT} and it receives a segment that
+contains the flag \flag{SYN} and the flag \flag{ACK} that acknowledges the previous \flag{SYN}
+sent, then the TCP responds by sending a flag \flag{ACK} to acknowledge the segment received
+and it proceeds to state \state{ESTABLISHED}.
+
+\subsubsection{User functions}
+
+In order to use the TCP protocol in programs, the norm defines user functions that can be invoked
+by the user in its code. This is the well-known \emph{socket API}, available on almost all operating
+systems, and known on POSIX systems as the \emph{Berkeley sockets}.
+This API specifies the already mentioned \texttt{open} and
+\texttt{close} functions, as well as functions \texttt{send} and \texttt{receive} to send
+or receive data. The behavior of each function is defined depending on the state of the
+TCP when the function is called.
+It appears in the state machine that most of the transitions are due to the reception of
+messages.
+
+\subsubsection{Tasks}
+
+A model with multiple tasks is adopted in the norm.
+Each task has a dedicated job. On task is dedicated to the sending and the reception of messages.
+Another is dedicated to the user functions and the last to timers. Timers can resend data or close
+a connection if the remote server does not respond.
+The first task performs most of the transitions in the state machine.
 
 
-Figures à inclures ici:
-\begin{itemize}
-    \item Une figure qui présente l'automate de transition. Expliquer que certaines transition sont effectuées par une action de l'utilisateur,
-          et que d'autres sont effectuées quand un segment est reçu.
-\end{itemize}
-
-
-\subsection{CycloneTCP library organisation}
+\subsection{CycloneTCP library organization}
 
     \input{OryxStack.tex}
 
     The CycloneTCP library is TCP/IP stack that implements network protocols.
-    Figure \ref{Fig:TcpStack} gives an overview of the different protocols supported. TCP and UDP protocols have a central place
-    in the stack. An API is provided to use those network protocols: the Socket API. It is a common way to use transport protocols,
-    and the application protocols in the stack, such as HTTP or FTP use it.
+    Figure \ref{Fig:TcpStack} gives an overview of the different protocols supported.
+    TCP and UDP protocols have a central place in the stack as well as the socket API.
+    This API is a common way to use transport protocols, but they can also be used
+    hidden the high level application protocols in the stack, such as HTTP or FTP.
 
     The stack is particularly well adapted to embedded platforms and microcontrolers. As a result, the code is written
-    to compile on those platforms and to be used with different real time OS, like for intance FreeRTOS.
+    to compile on those platforms and to be used with different real time OS, like, for instance, FreeRTOS.
     Hence, a model based on multiple tasks has been adopted to implement the TCP protocol as defined in the norm, with,
     in addition, complex cooperation mechanisms. A task is dedicated to the user code, another to timers, and the last is
     assigned to the processing of incoming segments. Then, user tasks can block without interfering the TCP/IP stack.
@@ -156,22 +242,23 @@ detect possible runtime errors and violations of functional contracts.
 
 \subsection{Interfacing SPARK and C Code}
 
-    To reduce the size of the work, only few functions have been totaly translated
+    To reduce the size of the work, only few functions have been totally translated
     in SPARK. Then, some C functions are reused in SPARK, and some SPARK functions
     are exported to be used in C code. The only constraint is that the
     declarations of both the SPARK and the C functions must match.
     The attribute \lstinline{Import} can be added to the declaration of a
     subprogram in SPARK to specify to the compiler that the function is defined
     in C. Symmetrically, the attribute \lstinline{Export} allows the subprogram
-    to be reused in C. An \lstinline{External_Name} might be given for the
+    to be reused in C. An \lstinline{External_Name} must be given for the
     programmers and the linker to locate the right symbol at the liking time.
 
 
     The types in SPARK can be more expressive than the ones used in C. However
-    they must have the same representation in memory to be used as an argument
-    of a function. The attribute \lstinline{Size} can be added to SPARK types
-    to keep them coherent with the C types. It specifies to the compiler the
-    size in bits requiered to store an object of this type.
+    they must have the same representation in memory in particular when an
+    object is shared between SPARK and C code.
+    The attribute \lstinline{Size} can be added to SPARK types to keep them
+    coherent with the corresponding C types. It specifies to the compiler the
+    size in bits required to store an object of this type.
 
     In addition, contracts can be added on imported subprograms. In this case,
     SPARK use their contracts to analyze other subprograms that call these imported
@@ -180,7 +267,7 @@ detect possible runtime errors and violations of functional contracts.
 
 \subsection{Dealing with Pointers}
 
-    In CycloneTCP library, pointers are often manupulated at top-level and
+    In CycloneTCP library, pointers are often manipulated at top-level and
     transmitted to C functions.  They are also used as fields in structures,
     for instance in the socket structure to store other complex data-structures
     and recursive pointer based data-structures.
@@ -200,16 +287,15 @@ detect possible runtime errors and violations of functional contracts.
     the state of the socket that we are interested in is modified and we want to
     track these modifications. But a lot of fields of the socket structure are not
     interesting to prove the correctness of the states transitions. Then, it is
-    necessary to create a model of the socket to describe the revelant field of
+    necessary to create a model of the socket to describe the relevant field of
     the socket to keep. Two models have been created, the first \lstinline{Model}
     that tracks the TCP state of the socket as well as basic fields of the socket,
     and the second \lstinline{Basic_Model} that only tracks the basic fields and
     loss all information about the TCP state.
 
     The post-conditions use these models in such way
-    \begin{lstlisting}[language=Ada]
-    Model(Sock) = (Model(Sock)'Old with delta
-                        State => TCP_STATE_CLOSED)
+    \begin{lstlisting}[style=Spark]
+    Model(Sock) = (Model(Sock)'Old with delta State => TCP_STATE_CLOSED)
     \end{lstlisting}
     where the \lstinline{Old} in \lstinline{Model(Sock)'Old} refers to the model
     of the socket before the call of the function, and \lstinline{with delta} is
@@ -231,7 +317,7 @@ detect possible runtime errors and violations of functional contracts.
     These two parts have been replaced by SPARK code and the absence of run-time errors has been proved for
     these parts.
     However, to be integrated with the existing library, it has been necessary to reuse existing C code
-    as an untrested black box, for which we cannot have strong guarantees. Figure \ref{Fig:TcpStack} gives an overview of
+    as an untrusted black box, for which we cannot have strong guarantees. Figure \ref{Fig:TcpStack} gives an overview of
     what have been translated and what have been reused. The box for TCP is hatched because only the user level functions
     has been translated in SPARK. The parsing and processing of incoming segment is let to the C code.
     Thus, other techniques and tools have helped the verification process, in particular for the TCP part. They are presented in this section.
@@ -241,31 +327,30 @@ detect possible runtime errors and violations of functional contracts.
 
 \begin{figure}[t]
 \begin{subfigure}{\textwidth}
-\begin{lstlisting}[language=C, frame=bottomline]
+\begin{lstlisting}[style=C, frame=bottomline]
 Socket *socketOpen(uint_t type, uint_t protocol);
-error_t socketConnect(Socket *socket, IpAddr *remoteIpAddr,
-                      uint16_t remotePort);
+error_t socketConnect(Socket *socket, IpAddr *remoteIpAddr, uint16_t remotePort);
 \end{lstlisting}
 \caption{C interface.}
 \label{Fig:socketInterface:C}
 \end{subfigure}
 \begin{subfigure}{\textwidth}
-\begin{lstlisting}[language=Ada, frame=bottomline]
+\begin{lstlisting}[style=Spark, frame=bottomline]
 type Socket_Struct is private;
 type Socket is access Socket_Struct;
 subtype Not_Null_Socket is not null Socket;
 type Socket_Type is (SOCKET_TYPE_STREAM, SOCKET_TYPE_DGRAM);
-type Socket_Proto is (SOCKET_IP_PROTO_TCP, SOCKET_IP_PROTO_UDP);
+type Socket_Prot is (SOCKET_IP_PROTO_TCP,SOCKET_IP_PROTO_UDP);
 
 procedure Socket_Open
     (Sock       :    out Socket;
      S_Type     : in     Socket_Type;
-     S_Protocol : in     Socket_Protocol)
+     S_Protocol : in     Socket_Prot)
 with
     Post => (if Sock /= null then
-        Sock.S_Type = S_Type and then
-        not Is_Initialized_Ip(Sock.S_Remote_Ip_Addr) and then
-        not Is_Initialized_Ip(Sock.S_localIpAddr));
+                Sock.S_Type = S_Type and then
+                not Is_Initialized_Ip(Sock.S_Remote_Ip_Addr) and then
+                not Is_Initialized_Ip(Sock.S_localIpAddr));
 
 procedure Socket_Connect
     (Sock           : in out Not_Null_Socket;
@@ -276,8 +361,8 @@ with
     Pre => Is_Initialized_Ip (Remote_Ip_Addr) and then
            Remote_Port > 0,
     Post => (if Error = NO_ERROR then
-            Is_Initialized_Ip(Sock.S_localIpAddr) and then
-            Sock.S_localIpAddr = Remote_Ip_Addr);
+                Is_Initialized_Ip(Sock.S_localIpAddr) and then
+                Sock.S_localIpAddr = Remote_Ip_Addr);
 \end{lstlisting}
 \caption{SPARK interface.}
 \label{Fig:socketInterface:SPARK}
@@ -324,18 +409,18 @@ with
     network protocols, they follow the same order of execution. Thus, an order can be enforced thanks to the pre- and postconditions.
     If a function $f_1$ must be executed before a function $f_2$, the strategy is to add a postcondition on the socket on $f_1$
     that is also a precondition for $f_2$. Then, for the precondition of $f_2$ to be true, the function $f_1$ must have been called first.
-    Such postcondition is presented on figure \ref{Fig:socketInterface:SPARK} for the function \lstinline{Socket_Connect}. After its
-    execution, the field \lstinline{S_Remote_Ip_Addr} of the socket \lstinline{Sock}. Then, since all the functions to send or receive
+    Such postcondition is presented on figure \ref{Fig:socketInterface:SPARK} for the function \lstinline[style=Spark]{Socket_Connect}. After its
+    execution, the field \lstinline[style=Spark]{S_Remote_Ip_Addr} of the socket \lstinline[style=Spark]{Sock}. Then, since all the functions to send or receive
     data and to close the connection require a connection established, these functions have a precondition that contains a condition
     that states that the condition is established, which can be written as
-    \begin{lstlisting}
-Pre => Is_Ip_Initialized(Sock.S_Remote_Ip_Addr);
+    \begin{lstlisting}[style=Spark]
+    Pre => Is_Ip_Initialized(Sock.S_Remote_Ip_Addr);
     \end{lstlisting}
     and because the function \lstinline{Socket_Connect} is the only one that can initialize this value, the order is respected
     if and only if the code is valid.
 
-    The same mechanism is used with the functions \lstinline{Socket_Open} that create a valid socket when the function
-    succeeds and \lstinline{Socket_Connect} that require a valid not null socket.
+    The same mechanism is used with the functions \lstinline[style=Spark]{Socket_Open} that creates a valid socket when the function
+    succeeds and \lstinline[style=Spark]{Socket_Connect} that requires a valid not null socket.
 
     GNATprove can prove that the order of the calls is respected, and then it can invalidate an incorrect program without requiring any
     tests. It helps programmers to write correct programs.
@@ -346,30 +431,30 @@ Pre => Is_Ip_Initialized(Sock.S_Remote_Ip_Addr);
     Most of the functions of the socket API can fail. To know if the function has failed or not, and error code is returned.
     It must be checked by the caller before continuing processing at the risk of leading to an incorrect state.
     In the previous paragraph we explained that the functions that send or receive data check in their precondition if the connection
-    has been initialized or not, by checking the field \lstinline{S_Remote_Ip_Addr}, and we explained that this value is initialized
-    by \lstinline{Socket_Connect}. The presence in the postcondition of \lstinline{Socket_Connect} or if statement
-    \lstinline{(if Error = NO_ERROR then ...)} makes that \lstinline{S_Remote_Ip_Addr} is initialized only when no error occurs during
+    has been initialized or not, by checking the field \lstinline[style=Spark]{S_Remote_Ip_Addr}, and we explained that this value is initialized
+    by \lstinline[style=Spark]{Socket_Connect}. The presence of the if statement \lstinline[style=Spark]{(if Error = NO_ERROR then ...)} in the postcondition
+    of \lstinline[style=Spark]{Socket_Connect}  makes that \lstinline[style=Spark]{S_Remote_Ip_Addr} is initialized only when no error is reported during
     the execution of the function. Thanks to the mechanism exposed in the previous section the next function can only be called
     if it is known that no error has occurred previously.
 
-    Let \lstinline{Socket_Send} be the function to send data. The following example of code is incorrect because if \lstinline{Error} is
+    Let \lstinline[style=Spark]{Socket_Send} be the function to send data. The following example of code is incorrect because if \lstinline{Error} is
     different to \lstinline{NO_ERROR}, nothing ensures that \lstinline{S_Remote_Ip_Addr} is initialized.
-    \begin{lstlisting}[language=Ada]
-Socket_Connect(Sock, Remote_Ip_Addr, Remote_Port, Error);
--- GNATprove: medium: precondition might fail.
-Socket_Send(Sock, Data, Written, Flags, Error);
-    \end{lstlisting}
-    In comparison this second example of code produces no error because when \lstinline{Socket_Send} is called, GNATprove knows that
-    \lstinline{ERROR} is equal to \lstinline{NO_ERROR} and then \lstinline{S_Remote_Ip_Addr} is initialized.
-    \begin{lstlisting}[language=Ada]
-Socket_Connect(Sock, Remote_Ip_Addr, Remote_Port, Error);
-if Error = NO_ERROR then
+    \begin{lstlisting}[style=Spark]
+    Socket_Connect(Sock, Remote_Ip_Addr, Remote_Port, Error);
+    -- GNATprove: medium: precondition might fail.
     Socket_Send(Sock, Data, Written, Flags, Error);
-end if;
+    \end{lstlisting}
+    In comparison this second example of code does not produce any check message because when \lstinline[style=Spark]{Socket_Send} is called, GNATprove knows that
+    \lstinline[style=Spark]{ERROR} is equal to \lstinline[style=Spark]{NO_ERROR} and then \lstinline[style=Spark]{S_Remote_Ip_Addr} is initialized.
+    \begin{lstlisting}[style=Spark]
+    Socket_Connect(Sock, Remote_Ip_Addr, Remote_Port, Error);
+    if Error = NO_ERROR then
+        Socket_Send(Sock, Data, Written, Flags, Error);
+    end if;
     \end{lstlisting}
 
     The same mechanism can be observed on figure \ref{Fig:socketInterface:SPARK}. The user has to test if the socket returned by
-    \lstinline{Socket_Open} is null or not before calling \lstinline{Socket_Connect}, otherwise GNATprove will emit a message.
+    \lstinline[style=Spark]{Socket_Open} is null or not before calling \lstinline[style=Spark]{Socket_Connect}, otherwise GNATprove will emit a message.
 
     Thanks to this use of GNATprove, one can ensure the correct use of the socket API, by ensuring a correct order for the
     calls of the functions and ensuring that error codes are checked.
@@ -436,7 +521,7 @@ end if;
     function is executed by KLEE. After its call, an assertion about the states $S'_1, \dots, S'_k$ of the socket after the execution
     of the function is added to check what are the resulting states. The states $S'_1, \dots, S'_k$ are extracted from the norm and adapted to the CycloneTCP
     implementation that can differ on some points.
-    After this work, we then have a postcondition for \lstinline{tcpProcessSegment}, that can be reported in the SPARK code for further proofs, of the form:
+    After this work, we get a postcondition for \lstinline{tcpProcessSegment}, that can be reported in the SPARK code for further proofs, of the form:
     \begin{lstlisting}[language=Ada,mathescape=true]
     if Sock.State'Old = $S_1$ then Sock.State in $S'_1$ | $S'_2$ | ... | $S'_k$
     \end{lstlisting}
@@ -447,16 +532,25 @@ end if;
     The previous part shows how we can compute all the transitions that can be done when a single message is received.
     It is now necessary to understand how the waiting procedure \lstinline{Tcp_Wait_For_Events} works.
     When it is called, it checks if the event is already true, thanks to a call to the function \lstinline{Tcp_Update_Events}.
-    If it is not the case, the mutex that enforces the mutual exclusion of access to the socket is unlocked.
-    Messages can be received until the event waited becomes true.
+    This function returns all the events that the socket satisfies when it is called.
+    If the event is not satisfied, the mutex that enforces the mutual exclusion of access to the socket is unlocked.
+    Several messages can be received until the event waited becomes true.
     Once a reception makes true the event, the function \lstinline{Tcp_Wait_For_Events} locks again the mutex and returns.
     A possible algorithm to simulate the reception of segment and compute the least set of states that can result of the wait can be done
-    by the algorithm \ref{algo:waitForEvents}.
+    by the algorithm~\ref{algo:waitForEvents}.
+
+    The parameter \textit{Event\_Mask} represents the event that we are waiting for. A loop of three steps simulates the
+    reception of three messages with a call to the function \lstinline[style=Spark]{Tcp_Process_One_Segment}. The new events
+    satisfied are computed, and if the searched event is reached, the socket is returned.
+    Then, it is possible for SPARK to compute all the relations that link the state of the input socket with the states
+    of the returned socket, depending on the event waited.
+    The loop is limited to three steps because all the paths in the automaton that do not require a user action have
+    a length of at most three.
 
     \begin{algorithm}
         \SetKwFunction{ProcessSegm}{\lstinline[language=Ada]{Tcp\_Wait\_For\_Events}}
         \SetKwProg{Fn}{function}{}{end}
-        \Fn{\ProcessSegm{Socket, Event, Event\_Mask}}{
+        \Fn{\ProcessSegm{Socket, Event\_Mask}}{
             $S_{last} := \text{\textit{Socket}}$\;
             $S := S_{last}$\;
             $E :=$ \lstinline[language=Ada]{Tcp_Update_Events}($S_{last}$)\;
@@ -473,12 +567,16 @@ end if;
             }
             \KwRet{$\emptyset$}\;
         }
-        \caption{Function to compute the possible states after a wait for a particular event.}
+        \caption{Function to compute the possible states after a wait for an event.}
         \label{algo:waitForEvents}
     \end{algorithm}
 
 \section{Results and bugs found}
 \label{sec:results}
+
+    The work done on the TCP implementation has shown the powerful
+    of SPARK in finding bugs. One of the bugs found, a memory leak,
+    relies on the use of the pointers.
 
     \begin{itemize}
         \item Bug de concurrence -> SPARK
@@ -497,7 +595,7 @@ end if;
     a big step toward a secure implementation. It has been proved by the tool GNATprove that our implementation is free
     of run-time errors and that all the transitions in the TCP state machine are done with respect to the norm.
 
-    However weeknesses exist our implementation, in particular because all the underlying layers are still written in C.
+    However weeknesses exist in our implementation, in particular because all the underlying layers are still written in C.
     The principal function of those layers is to format packet before they are sent, or parse incoming packets, check
     their integrity and transmit the resulting payload to the corresponding upper level layer.
     This processing part can be a source of errors and bugs as explain in~\cite{Reiher2019RecordFluxFM}.
