@@ -3,15 +3,6 @@
 \usepackage{listings}
 \usepackage[colorlinks]{hyperref}
 
-\ifLuaTeX
-    \usepackage{fontspec}
-    \IfFontExistsTF{Fira Code}
-    {\setmonofont[Scale=MatchLowercase]{Fira Code}}
-    {\IfFontExistsTF{DejaVu Sans Mono}{
-        \setmonofont{DejaVu Sans Mono}[Scale=MatchLowercase]
-    }{}}
-\fi
-
 \usepackage[x11names]{xcolor}
 
 \usepackage[ruled]{algorithm2e}
@@ -50,6 +41,8 @@
     keywordstyle = \bfseries,
     classoffset = 0,
 }
+
+\let\Spark\lstinline
 
 \let\state\textsf
 \let\flag\textsf
@@ -329,7 +322,8 @@ detect possible runtime errors and violations of functional contracts.
 \begin{subfigure}{\textwidth}
 \begin{lstlisting}[style=C, frame=bottomline]
 Socket *socketOpen(uint_t type, uint_t protocol);
-error_t socketConnect(Socket *socket, IpAddr *remoteIpAddr, uint16_t remotePort);
+error_t socketConnect(Socket *socket, IpAddr *remoteIpAddr,
+                      uint16_t remotePort);
 \end{lstlisting}
 \caption{C interface.}
 \label{Fig:socketInterface:C}
@@ -347,10 +341,11 @@ procedure Socket_Open
      S_Type     : in     Socket_Type;
      S_Protocol : in     Socket_Prot)
 with
-    Post => (if Sock /= null then
-                Sock.S_Type = S_Type and then
-                not Is_Initialized_Ip(Sock.S_Remote_Ip_Addr) and then
-                not Is_Initialized_Ip(Sock.S_localIpAddr));
+  Post =>
+    (if Sock /= null then
+      Sock.S_Type = S_Type and then
+      not Is_Initialized_Ip(Sock.S_Remote_Ip_Addr) and then
+      not Is_Initialized_Ip(Sock.S_localIpAddr));
 
 procedure Socket_Connect
     (Sock           : in out Not_Null_Socket;
@@ -358,11 +353,11 @@ procedure Socket_Connect
      Remote_Port    : in     Port;
      Error          :    out Error_T)
 with
-    Pre => Is_Initialized_Ip (Remote_Ip_Addr) and then
-           Remote_Port > 0,
-    Post => (if Error = NO_ERROR then
-                Is_Initialized_Ip(Sock.S_localIpAddr) and then
-                Sock.S_localIpAddr = Remote_Ip_Addr);
+  Pre => Is_Initialized_Ip (Remote_Ip_Addr) and then
+          Remote_Port > 0,
+  Post => (if Error = NO_ERROR then
+              Is_Initialized_Ip(Sock.S_localIpAddr) and then
+              Sock.S_localIpAddr = Remote_Ip_Addr);
 \end{lstlisting}
 \caption{SPARK interface.}
 \label{Fig:socketInterface:SPARK}
@@ -409,18 +404,18 @@ with
     network protocols, they follow the same order of execution. Thus, an order can be enforced thanks to the pre- and postconditions.
     If a function $f_1$ must be executed before a function $f_2$, the strategy is to add a postcondition on the socket on $f_1$
     that is also a precondition for $f_2$. Then, for the precondition of $f_2$ to be true, the function $f_1$ must have been called first.
-    Such postcondition is presented on figure \ref{Fig:socketInterface:SPARK} for the function \lstinline[style=Spark]{Socket_Connect}. After its
-    execution, the field \lstinline[style=Spark]{S_Remote_Ip_Addr} of the socket \lstinline[style=Spark]{Sock}. Then, since all the functions to send or receive
+    Such postcondition is presented on figure \ref{Fig:socketInterface:SPARK} for the function \Spark{Socket_Connect}. After its
+    execution, the field \Spark{S_Remote_Ip_Addr} of the socket \Spark{Sock}. Then, since all the functions to send or receive
     data and to close the connection require a connection established, these functions have a precondition that contains a condition
     that states that the condition is established, which can be written as
     \begin{lstlisting}[style=Spark]
     Pre => Is_Ip_Initialized(Sock.S_Remote_Ip_Addr);
     \end{lstlisting}
-    and because the function \lstinline{Socket_Connect} is the only one that can initialize this value, the order is respected
+    and because the function \Spark{Socket_Connect} is the only one that can initialize this value, the order is respected
     if and only if the code is valid.
 
-    The same mechanism is used with the functions \lstinline[style=Spark]{Socket_Open} that creates a valid socket when the function
-    succeeds and \lstinline[style=Spark]{Socket_Connect} that requires a valid not null socket.
+    The same mechanism is used with the functions \Spark{Socket_Open} that creates a valid socket when the function
+    succeeds and \Spark{Socket_Connect} that requires a valid not null socket.
 
     GNATprove can prove that the order of the calls is respected, and then it can invalidate an incorrect program without requiring any
     tests. It helps programmers to write correct programs.
@@ -431,21 +426,21 @@ with
     Most of the functions of the socket API can fail. To know if the function has failed or not, and error code is returned.
     It must be checked by the caller before continuing processing at the risk of leading to an incorrect state.
     In the previous paragraph we explained that the functions that send or receive data check in their precondition if the connection
-    has been initialized or not, by checking the field \lstinline[style=Spark]{S_Remote_Ip_Addr}, and we explained that this value is initialized
-    by \lstinline[style=Spark]{Socket_Connect}. The presence of the if statement \lstinline[style=Spark]{(if Error = NO_ERROR then ...)} in the postcondition
-    of \lstinline[style=Spark]{Socket_Connect}  makes that \lstinline[style=Spark]{S_Remote_Ip_Addr} is initialized only when no error is reported during
+    has been initialized or not, by checking the field \Spark{S_Remote_Ip_Addr}, and we explained that this value is initialized
+    by \Spark{Socket_Connect}. The presence of the if statement \Spark{(if Error = NO_ERROR then ...)} in the postcondition
+    of \Spark{Socket_Connect}  makes that \Spark{S_Remote_Ip_Addr} is initialized only when no error is reported during
     the execution of the function. Thanks to the mechanism exposed in the previous section the next function can only be called
     if it is known that no error has occurred previously.
 
-    Let \lstinline[style=Spark]{Socket_Send} be the function to send data. The following example of code is incorrect because if \lstinline{Error} is
+    Here, \Spark{Socket_Send} refers to the function to send data. The following example of code is incorrect because if \lstinline{Error} is
     different to \lstinline{NO_ERROR}, nothing ensures that \lstinline{S_Remote_Ip_Addr} is initialized.
     \begin{lstlisting}[style=Spark]
     Socket_Connect(Sock, Remote_Ip_Addr, Remote_Port, Error);
     -- GNATprove: medium: precondition might fail.
     Socket_Send(Sock, Data, Written, Flags, Error);
     \end{lstlisting}
-    In comparison this second example of code does not produce any check message because when \lstinline[style=Spark]{Socket_Send} is called, GNATprove knows that
-    \lstinline[style=Spark]{ERROR} is equal to \lstinline[style=Spark]{NO_ERROR} and then \lstinline[style=Spark]{S_Remote_Ip_Addr} is initialized.
+    In comparison this second example of code does not produce any check message because when \Spark{Socket_Send} is called, GNATprove knows that
+    \Spark{ERROR} is equal to \Spark{NO_ERROR} and then \Spark{S_Remote_Ip_Addr} is initialized.
     \begin{lstlisting}[style=Spark]
     Socket_Connect(Sock, Remote_Ip_Addr, Remote_Port, Error);
     if Error = NO_ERROR then
@@ -454,7 +449,7 @@ with
     \end{lstlisting}
 
     The same mechanism can be observed on figure \ref{Fig:socketInterface:SPARK}. The user has to test if the socket returned by
-    \lstinline[style=Spark]{Socket_Open} is null or not before calling \lstinline[style=Spark]{Socket_Connect}, otherwise GNATprove will emit a message.
+    \Spark{Socket_Open} is null or not before calling \Spark{Socket_Connect}, otherwise GNATprove will emit a message.
 
     Thanks to this use of GNATprove, one can ensure the correct use of the socket API, by ensuring a correct order for the
     calls of the functions and ensuring that error codes are checked.
@@ -523,7 +518,7 @@ with
     implementation that can differ on some points.
     After this work, we get a postcondition for \lstinline{tcpProcessSegment}, that can be reported in the SPARK code for further proofs, of the form:
     \begin{lstlisting}[language=Ada,mathescape=true]
-    if Sock.State'Old = $S_1$ then Sock.State in $S'_1$ | $S'_2$ | ... | $S'_k$
+  if Sock.State'Old = $S_1$ then Sock.State in $S'_1$ | $S'_2$ | ... | $S'_k$
     \end{lstlisting}
 
 
@@ -540,7 +535,7 @@ with
     by the algorithm~\ref{algo:waitForEvents}.
 
     The parameter \textit{Event\_Mask} represents the event that we are waiting for. A loop of three steps simulates the
-    reception of three messages with a call to the function \lstinline[style=Spark]{Tcp_Process_One_Segment}. The new events
+    reception of three messages with a call to the function \Spark{Tcp_Process_One_Segment}. The new events
     satisfied are computed, and if the searched event is reached, the socket is returned.
     Then, it is possible for SPARK to compute all the relations that link the state of the input socket with the states
     of the returned socket, depending on the event waited.
@@ -574,9 +569,32 @@ with
 \section{Results and bugs found}
 \label{sec:results}
 
-    The work done on the TCP implementation has shown the powerful
+    The work done on the TCP implementation has shown the strength
     of SPARK in finding bugs. One of the bugs found, a memory leak,
     relies on the use of the pointers.
+
+\subsubsection{Concurrency bug}
+
+    The most significant problem found in the TCP implementation relies on the concurrency.
+    Concurrency is one of the biggest source of bug when writing code. It is hard to understand
+    all the possible interactions between different threads which leads to many bugs that can be
+    difficult to reproduce and to debug. The use of SPARK helps us to find one.
+
+    %% TODO : Show the relevant code snippet here
+
+\subsubsection{Memory leak}
+
+    A memory leak has been found thanks by SPARK and the recent work of Dross and Kanig~\cite{dross2020recursive}.
+    They added a pointer support to SPARK inspired by Rust. At any program point, every memory cell must be owned by a pointer.
+    If a memory cell has not be freed and is not owned anymore by any pointer, there is a memory leaks.
+    This mechanism of ownership has helped in finding one memory leak in the original C code that has been fixed in the
+    SPARK version of the code.
+
+%% Ici on peut parler d'une ou deux typos trouvées dans le code. Mais plutôt liées à une relecture de code et pas vraiment dues à SPARK
+
+\subsubsection{Metrics of the new implementation}
+
+\subsubsection{Tests to validate the new implementation}
 
     \begin{itemize}
         \item Bug de concurrence -> SPARK
