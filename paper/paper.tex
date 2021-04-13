@@ -35,7 +35,7 @@
     classoffset = 1,
     morekeywords = {Socket_Struct, Socket, Not_Null_Socket, Socket_Type, Socket_Prot, IpAddr, Error_T, Port},
     classoffset = 2,
-    morekeywords = {Socket_Open, Socket_Connect, Socket_Send},
+    morekeywords = {Socket_Open, Socket_Connect, Socket_Send, Tcp_Send, Tcp_Wait_For_Events, Tcp_Send_Segment, Tcp_Change_State},
     classoffset = 7,
     morekeywords = {Pre, Post},
     keywordstyle = \bfseries,
@@ -576,11 +576,68 @@ with
 \subsubsection{Concurrency bug}
 
     The most significant problem found in the TCP implementation relies on the concurrency.
-    Concurrency is one of the biggest source of bug when writing code. It is hard to understand
+    Concurrency is one of the biggest source of bugs when writing code. It is hard to understand
     all the possible interactions between different threads which leads to many bugs that can be
     difficult to reproduce and to debug. The use of SPARK helps us to find one.
+\begin{figure}[t]
+\begin{lstlisting}[style=Spark, frame=bottomline, basicstyle=\ttfamily\footnotesize,
+                    numbers=left, numberstyle=\tiny, escapechar=\%]
+case Sock.State is
+  when TCP_STATE_SYN_RECEIVED
+      | TCP_STATE_ESTABLISHED =>
+  -- Flush the send buffer
+  Tcp_Send (Sock, Buf, Ignore_Written,      % \label{bugProg:tcpSend} %
+            SOCKET_FLAG_NO_DELAY, Error);
+  if Error /= NO_ERROR then return; end if;
+  -- Make sure all the data has been sent out
+  Tcp_Wait_For_Events   % \label{bugProg:tcpWaitForEvents} %
+    (Sock       => Sock,
+    Event_Mask => SOCKET_EVENT_TX_DONE,
+    Timeout    => Sock.S_Timeout,
+    Event      => Event);
+  if Event /= SOCKET_EVENT_TX_DONE then
+    Error := ERROR_TIMEOUT; return;
+  end if;
+  -- Send a FIN segment
+  Tcp_Send_Segment      % \label{bugProg:tcpWaitForEventsPost} %
+    (Sock         => Sock,
+    Flags        => TCP_FLAG_FIN or TCP_FLAG_ACK,
+    Seq_Num      => Sock.sndNxt,
+    Ack_Num      => Sock.rcvNxt,
+    Length       => 0,
+    Add_To_Queue => True,
+    Error        => Error);
+  if Error /= NO_ERROR then return; end if;
+  -- Switch to the FIN-WAIT-1 state
+  Tcp_Change_State (Sock, TCP_STATE_FIN_WAIT_1); % \label{bugProg:tcpChangeState} %
+\end{lstlisting}
+\caption{Reproduction of the code where the concurrency bug has been found.}
+\label{fig:concurrencyBug}
+\end{figure}
 
-    %% TODO : Show the relevant code snippet here
+    A snippet in figure~\ref{fig:concurrencyBug} shows a bug of this kind found in the initial code.
+    At line~\ref{bugProg:tcpSend}, the buffer is flushed, if no error happened during this stage,
+    the state of the socket is either \state{ESTABLISHED} or \state{CLOSE\_WAIT} because the mutex
+    that protected the socket has been released and a transition has possibly be done. The call to
+    \Spark{Tcp_Wait_For_Events} at line~\ref{bugProg:tcpWaitForEvents}, produces, if succeeds, the
+    state of the socket to be in the set \state{ESTABLISHED}, \state{CLOSE\_WAIT} or \state{CLOSED}.
+    After, those two calls, \Spark{Tcp_Send_Segment} is called to initiate a closing of the connection
+    by sending a \flag{FIN} flag at line~\ref{bugProg:tcpWaitForEventsPost}.
+
+    The programmer who wrote this code forgot that the state of the socket has changed during the last
+    called and when the \flag{FIN} flag is sent, he though that the state was still \state{SYN\_RECEIVED}
+    or \state{ESTABLISHED}. The transition that looks the most appropriate for him is to jump in the state
+    \state{FIN\_WAIT\_1}, as done at line~\ref{bugProg:tcpChangeState}. Unfortunately, this change of
+    state makes the transitions \state{CLOSE\_WAIT} $\rightarrow$ \state{FIN\_WAIT\_1} and
+    \state{CLOSED} $\rightarrow$ \state{FIN\_WAIT\_1} possible. Those two transitions do not
+    appear in the state machine in figure~\ref{Fig:statemachine} because they are forbidden by the
+    norm.
+
+    As the precondition given to the function \Spark{Tcp_Change_State} lists all the authorized transition,
+    SPARK warmed up that an incorrect transition was possible in the current code. The code has been reported to
+    the maintainer of the TCP/IP stack and fixed.
+
+
 
 \subsubsection{Memory leak}
 
@@ -591,19 +648,19 @@ with
     SPARK version of the code.
 
 %% Ici on peut parler d'une ou deux typos trouvées dans le code. Mais plutôt liées à une relecture de code et pas vraiment dues à SPARK
+\subsubsection{Tests to validate the new implementation}
+
+    In addition to the guarantees given by SPARK, we have carried out some tests by enabling the assertions at the runtime.
+    Doing so strengthen our confidence in the assertions written in SPARK, and in particular it provides more sureness
+    that the assertions written are not broken by C code. The assertion are checked during the execution time
+    and if one of them is violated, a runtime error is raised and it is possible to investigate.
+
+    In order to do that, we have written some HTTP drivers with different scenarios. During the different runs,
+    no assertion has been violated.
 
 \subsubsection{Metrics of the new implementation}
 
-\subsubsection{Tests to validate the new implementation}
-
-    \begin{itemize}
-        \item Bug de concurrence -> SPARK
-        \item Memory leak -> SPARK
-        \item Problèmes trouvés.
-        \item Résultats sur la nouvelle implémentation (performance, taille du code).
-        \item Activation des préconditions pour voir si elles sont toutes valides.
-    \end{itemize}
-
+    \textcolor{red}{TODO : Quoi mettre ?}
 
 
 \section{Conclusion and future work}
