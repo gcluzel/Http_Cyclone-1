@@ -77,13 +77,13 @@
 
 \author{%
 \IEEEauthorblockN{Guillaume Cluzel}
-\IEEEauthorblockA{\textit{Adacore \& ENS de Lyon}}
+\IEEEauthorblockA{\textit{AdaCore \& ENS de Lyon}}
 \and
 \IEEEauthorblockN{Kyriakos Georgious}
-\IEEEauthorblockA{\textit{Adacore \& University of Bristol}}
+\IEEEauthorblockA{\textit{AdaCore \& University of Bristol}}
 \and
 \IEEEauthorblockN{Yannick Moy}
-\IEEEauthorblockA{\textit{Adacore}}
+\IEEEauthorblockA{\textit{AdaCore}}
 \and
 \IEEEauthorblockN{Clément Zeller}
 \IEEEauthorblockA{\textit{Oryx Embedded}}
@@ -145,7 +145,7 @@ stack in C by replacing parts of the code with formally verified code in SPARK.
 The stack chosen, CycloneTCP\footnote{\url{https://www.oryx-embedded.com/products/CycloneTCP.html}},
 a mature TCP/IP stack targeted at embedded processors with no Operating System.
 We present the TCP protocol in section~\ref{sec:TCP} and then briefly the
-choosen stack, the Oryx Embedded one, in section~\ref{sec:stack}
+chosen stack, the Oryx Embedded one, in section~\ref{sec:stack}
 before presenting the specification techniques used in section~\ref{sec:spec}
 and then in sections~\ref{sec:verif} and~\ref{sec:API} we explain how we
 formally implemented in SPARK the TCP user functions and how we hardened the
@@ -191,7 +191,7 @@ the data and 3)~closing the connection.
 The behavior of the three-phase communication can be described by the state
 machine.
 Every group of states corresponds to a one phase. More precisely \sclosed
-stands for a closed connection. Both states \ssynsent and \ssynrcv denotes the
+stands for a closed connection. Both states \ssynsent and \ssynrcv denote the
 state that a TCP process can take during the initiation of a new connection. The
 state \sestab represents the state when the connection is established,
 \textit{i.e.} when two TCPs can communicate by sending and receiving data.
@@ -358,9 +358,8 @@ The socket structure is shared between different functions, and contains a lot
 of fields. Most of the fields are used in other parts of library and are not
 relevant for our verification. We only need to concentrate on a subset of fields
 to make the specifications easier to write, and to understand.
-This can be achieve in SPARK by using \emph{models} and \emph{ghost code}.
-The ghost code is code uses by GNATprove to simplify the proof that is removed
-by the compiler to keep the size of executable file reasonable.
+This can be achieved in SPARK by using \emph{models} and \emph{ghost code}
+which are used by GNATprove for analysis but not compiled in the final executable.
 
 In the contract, we use the construction \spark{Model(Sock)} to refer the
 relevant fields of the object \spark{Sock} where
@@ -417,8 +416,8 @@ by the code.
 
 When a transition has to be made in the code, it is made through the helper
 function \spark{TCP_Change_State}. The precondition of this function describes
-all the allowed transitions. Therefore, we try to do an forbidden transition,
-GNATprove will display a warning. This is the most direct way to make a
+all the allowed transitions. Therefore, when we try to do a forbidden transition,
+GNATprove will display a message. This is the most direct way to make a
 transition in the state machine.
 As the TCP user functions are all protected with a mutex to avoid interferences
 from other threads that could change the TCP state during their execution, in
@@ -428,7 +427,7 @@ functions.
 
 There is only one function that makes the verification harder because it
 releases the mutex: the function \spark{TCP_Wait_For_Events}.
-It takes as an arguments an event to wait and returns once the event
+It takes as argument an event to wait and returns once the event
 is triggered by the reception of a segment.
 The role of this
 function is to release the mutex and allow the reception task to process the
@@ -443,7 +442,7 @@ find a better contract to this function.
 
 \subsection{Dealing with synchronous changes of states}
 
-The function \spark{TCP_Wait_For_Events} first checks if the events is not already
+The function \spark{TCP_Wait_For_Events} first checks if the event is not already
 true. If not, the mutex is released until a segment that triggered the event is
 received or until the timeout is reach. Each time a new segment is received, it
 is processed and if it contains a segment that causes a change of state, the TCP
@@ -575,7 +574,7 @@ order also is being conveyed by the protocol's state machine given in
 figure~\ref{Fig:statemachine}.
 Ada's pre- and postconditions are a powerful tool to express such inter-function
 dependencies, while SPARK technology can be used to guarantee that the
-assertions always hold. Thus, post- and preconditions were introduced to model
+assertions always hold. Thus, pre- and postconditions were introduced to model
 a partial order on the calls to the API's functions.
 
 \begin{figure}
@@ -704,7 +703,7 @@ we try to jump to the state \sfwone and thus the transitions $\text{\sclosew}
 possible.
 
 But these transition are not allowed by the norm, and thus not allowed by the
-precondition of \spark{TCP_Change_State}. The problem is warm by SPARK and a fix
+precondition of \spark{TCP_Change_State}. The problem is detected by SPARK and a fix
 has been proposed.
 
 
