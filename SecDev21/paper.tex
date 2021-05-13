@@ -1,7 +1,5 @@
 \documentclass[conference]{IEEEtran}
 
-% Class modification
-\IEEEilabelindent=0pt
 
 \usepackage[utf8]{inputenc}
 \usepackage[x11names]{xcolor}
@@ -154,99 +152,110 @@ of our work.
 
 
 
-\section{TCP protocol}
+\section{Overview of the TCP protocol specification}
 \label{sec:TCP}
 
+This section gives an overview of the TCP functional specification without going
+into unnecessary depth. A complete description of the protocol’s specification
+can be found at the RFC 793 document~\cite{rfc793}.
+
+Networking communication models define the processes of transferring information
+from one network component to another. Figure~\ref{Fig:TcpStack}
+shows an overview of the OSI model with its different layers.
+Layering is an essential design
+requirement for both models to achieve modularity, flexibility, and abstraction.
+Applications that only need to use the functionality of the lower levels can
+drop all the unnecessary upper levels. Furthermore, layering enables easier
+troubleshooting as the network's functionality is well-defined and split between
+the different layers. Each layer supports a wide range of protocols that are
+compatible with the layer's specifications. The lowest layers, bottom layers in
+Figure~\ref{Fig:TcpStack},
+are more hardware-oriented, while the top layers are more software specific.
+While the \emph{application} level
+has a wide range of protocols that can be used depending on the application
+specification, the \emph{transport} layer is heavily depended on the two
+dominant protocols: Transmission Control Protocol (TCP) and
+User Datagram Protocol (UDP).
+
+TCP is a connection-oriented protocol; a
+connection between the sender and the receiver must be established before
+transmitting any data. Furthermore, TCP is a reliable protocol since it
+guarantees the delivery of all the messages and that they are delivered in the
+order they were sent. It also provides error-checking mechanisms to discard and
+recover any corrupted data.
+
 Initially described by the ``fathers of the Internet'' Vincent Cerf and Bob
-Kahn, the TCP protocol was standardized in 1981 by RFC 793~\cite{rfc793}.
-Its sturdiness makes it still one of the most widely used protocols today with
-UDP.
-
-In the OSI networking communication model, the TCP protocol is central and
-located in the \emph{Transport layer}. It itself uses the \emph{Network layer}
-to work.
-The security of the \emph{Application} protocols depends on the security of
-the \emph{Session layer} and consequently on the security of the TCP and UDP
-protocols. Figure~\ref{Fig:TcpStack} gives an overview of how protocols are
-stacked.
-
-The purpose of this section is to give enough context to enable the reader to
-follow the work conducted in this article.
-The TCP protocol is connection-oriented in the sense that a connection requires
-to be established between the two processes that exchange data.
-The protocol is governed by a state machine described in
-figure~\ref{Fig:statemachine}.
-The implementation is rather free and lots of choices are left to the
-programmer. However, the implementation must ensure some properties to be able
-to communicate with other TCPs.
+Kahn, the TCP protocol was standardized in 1981 in~\cite{rfc793}.
+Its sturdiness still makes it one of the most widely used protocols 40 years
+later. Indeed, almost any networking application is using either the TCP or the
+UDP protocols to traffic data between the Network and the Application layers.
 
 \input{Automaton.tex}
 
-\subsection{States}
+\subsection{TCP state machine}
 
 Generally, every TCP communication session will go through the following three
 phases (if no error occurs): 1)~opening the connection 2)~sending and receiving
 the data and 3)~closing the connection.
 
 The behavior of the three-phase communication can be described by the state
-machine.
-Every group of states corresponds to a one phase. More precisely \sclosed
-stands for a closed connection. Both states \ssynsent and \ssynrcv denote the
-state that a TCP process can take during the initiation of a new connection. The
-state \sestab represents the state when the connection is established,
-\textit{i.e.} when two TCPs can communicate by sending and receiving data.
-Then, two groups of states can be distinguished: the group formed by \sfwone,
-\sfwtwo, \sclosing and \stimewait and that represents the state that a TCP can
-reach when it is closing its connection and it is at the origin of the closing;
-and the group formed by the state \sclosew and \slastack when the connection is
-closing and the closing was initiated by the remote TCP.
-Finally, the state \slisten stands for a TCP that is waiting for an incoming
-connection.
+machine in figure~\ref{Fig:statemachine}.
 
-\subsection{Flags}
+An edge represents a state transition. A transition is either triggered by an
+explicit action, stated in italics format on the label's edge, for example,
+\textit{Close}, or is triggered by the arrival of a specific flag/s.
+An edge-label in the format of $\frac{\ \ x \ \ }{\ \ y \ \ }$
+represents the associated flags transmitted with each transition, where $x$
+is either send or receive and $y$ refers to the actual
+flag/s transmitted in response to the action that caused the state-transition.
+An explicit action is either a user-triggered action (through the user's API)
+or an automatically performed action triggered by a timeout event. The flags are
+embedded in the header section of a transmitted segment and can be one of the
+following:
+\begin{itemize}
+\item \ack: the last message received by the sender is acknowledged.
+\item \syn: this flag is sent to establish a connection.
+\item \fin: this flag is sent to close the connection.
+\item \rst: this flag is sent to reset the connection, often when an error
+occurred in one or the other side.
+\end{itemize}
 
-The transition between the states are dictated by three things: user
-actions, the reception of flags and timers. When a transition is triggered, a
-response is given by sending of flags. The user actions, written in italic in
-the automaton, can be an active or passive opening, or a close.
-The corresponding user functions are detailed in the next paragraph.
-The main flags that can be sent appear in figure~\ref{Fig:statemachine}.
-They are sent alongside TCP segments, in the header.
-
-The \syn flag is sent to synchronize two TCPs when they want to initiate a
-connection. With a \ack flag, the last message received by the sender is
-acknowledged. \fin is sent when a TCP wants to close the connection.
-Moreover, a flag named \rst can be sent or received at any time and it forces the
-connection to be reset. If so, both TCPs jump to the state \sclosed.
-
-The state machine in figure~\ref{Fig:statemachine} does not reflect
-error-conditions or any action which are not connected with the state changes.
+The state machine in figure~\ref{Fig:statemachine} does not represent the
+complete protocol specification; for example, it does not reflect
+error-conditions or any actions which are not connected with the state changes.
 Rather, it gives an overview of all the possible states a TCP connection could
-reach over its lifetime. The transition are represented in the format
-$\frac{\ \ x \ \ }{\ \ y \ \ }$ where $x$ is the event that triggers the
-transition and $y$ is the response given to fulfil the transition.
+reach over its lifetime.
+
+Each state has a meaning. \slisten represents waiting for a connection request
+from any remote TCP and port. \ssynsent and \ssynrcv represent the
+initialization of the connection, that ends when \sestab is reached.
+\sfwone, \sfwtwo, \sclosing and \stimewait are a group of states that represents
+waiting for a connection termination request from remote TCP. \sclosew and
+\slastack represent waiting for a connection termination request from local
+user. Finally, \sclosed represents no connection state at all.
 
 
-\subsection{User functions}
+\subsection{TCP Multitasking model}
 
-In order to use the TCP protocol in programs, the nom defines user functions that
-can be invoked by the software programmer in his code. This is the well-known
-\emph{socket API}, available on almost all operating systems and known on POSIX
-systems as the Berkeley sockets. This API specifies the already mentioned
-\code{open} and \code{close} functions, as well as functions \code{send} and
-\code{receive} to send or receive data once the connection is opened. The
-behavior of each function is defined depending on the state of the TCP when the
-function is called.
-Even if user functions can initiate a change of state, it appears in the state
-machine that most of transition are initiated by the reception of flags.
-
-\subsection{Tasks}
-
-A model with multiple tasks is adopted in the norm. Each task has a dedicated
-job. One task is dedicated to the sending and the reception of messages. Another
-is dedicated to the user functions and the last to the timers. Timers can resend
-data or close a connection if the remote server does not acknowledged a message.
-The first task mentioned performs most of the transitions.
+Different tasks can interact and update the socket data structure to handle the
+various events that can occur within a TCP session. The TCP norm, under
+Section “3.9. Event Processing” page 52, describes a possible implementation
+of how to handle these events based on three tasks: one for the
+\emph{user calls}, one for the \emph{arriving segments} and one for the
+\emph{timers}.
+The role of each of the three tasks can be summarized as follow:
+User calls refer to functions, namely \texttt{open}, \texttt{close},
+\texttt{abort}, \texttt{send} and \texttt{receive}, that can be called
+by the user to control the connection, send, or receive data.
+These functions can trigger transitions between the connection's states since
+they are intended to control the connection.
+In the arriving segments task, the received segments are being processed,
+and the corresponding messages are sent back. Transitions between
+states can be triggered on the reception of a segment.
+Finally, timers control the timeouts, for example, the retransmission
+timeout to retransmit a message, or the time-wait timeout to close the
+connection after a specified amount of time elapsed. Thus, corresponding
+transitions to the timeout events can also be triggered by this task.
 
 \section{CycloneTCP library}
 \label{sec:stack}
@@ -269,6 +278,12 @@ protocol as described in the norm, with, in addition, complex cooperation
 mechanisms. A task is dedicated to the user code, another to the timers and the
 last is assigned to the processing of the incoming segments.
 It can also run on bare metal environment.
+
+In the CycloneTCP implementation, the socket data structure is used to retain
+the status of a TCP connection. Furthermore, a socket can be
+manipulated by the user through the TCP's library Application Programming
+Interface (API) to perform various TCP operations, such as the transmission of
+data.
 
 The quality of the C implementation hailed in the AMNESIA:33 report~\cite{AMNESIA33}
 as one of the most resilient TCP/IP stack. This gives a really good assurance
