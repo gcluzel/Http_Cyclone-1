@@ -46,8 +46,8 @@
 
 \def\spark#1{\lstinline[language=Ada]{#1}}
 
-
-\def\todo#1{\textcolor{red}{[#1]}}
+\usepackage{todonotes}
+%\def\todo#1{\textcolor{red}{[#1]}}
 
 \def\state#1{\textsf{\MakeUppercase{#1}}\xspace}
 \def\sclosed{\state{closed}}
@@ -110,7 +110,7 @@ Networking communication models define the processes of transferring information
 Existing research deals with formally verifying several protocols TCP/IP stack levels. For example, the work in \emph{miTLS} \cite{bhargavan2013implementing} formally verifies an SSL/TLS protocol implementation, and the work in \cite{Reiher_2020} uses a technology called RecordFlux to safely parse data segments. Given the reliance of the other software-level protocols on the TCP protocol, formalizing the its specification and verifying its implementation is critical. Achieving these two goals in practice is challening. This is mainly because TCP's specification, \cite{rfc793}, is written in English rather than any formal language, leaving many parts underspecified. Moreover, the TCP protocol is inherently concurrent, making it complex to specify and verify. Previous work focused on formalizing the protocol to either prove key properties \cite{smith1996formal} or fully verify the TCP protocol's specifications \cite{ridge2008rigorous} using the HOL proof assistant tool. While for the later work, the authors claim that it is possible from their formalization to extract an actual implementation in Haskell, this has not been achieved yet. At this point of writing, we are not aware of any formally verified TCP protocol implementation.
 
 In this paper, we take a practical approach, where the security of an existing TCP/IP stack implementation written in ANSI C programming language is incrementally enhanced by replacing parts of its code with formally verified code in SPARK \cite{mccormick_chapin_2015}. SPARK 2014 is a programming language designed as a subset of the Ada language to produce highly reliable software through formal verification. For this work, the CycloneTCP, a professional-grade embedded TCP/IP library developed by the Oryx Embedded company \cite{CycloneTCP}. \Cref{Fig:TcpStack} shows the protocols supported by the library. This work focuses on the TCP and socket components of the stack. The library's TCP implementation is meant to conform with the RFC 793 protocol specifications \cite{rfc793}. The quality of the CycloneTCP is acknowledged by the AMNESIA:33 report \cite{AMNESIA33}, which classifies it as one of the most resilient TCP/IP stack. By using as a starting point such a well-tested and widely used TCP/IP implementation, the IoT industry can have an immediate benefit by adopting this work's security-enhanced version of the CycloneTCP library. 
-
+\todo[inline]{pending contributions list and fixing the next paragraph.}
 We present the TCP protocol in section~\ref{sec:TCP} and then briefly the
 chosen stack, the Oryx Embedded one, in section~\ref{sec:stack}
 before presenting the specification techniques used in section~\ref{sec:spec}
@@ -144,7 +144,7 @@ The state machine in \cref{Fig:statemachine} does not represent the complete pro
 TCP is based on a multitasking model. Different tasks can interact and update the socket data structure, used to retain the status of a TCP connection, to handle the various events that can occur within a TCP session. The TCP norm, \cite{rfc793} , under Section "3.9. Event Processing" page 52, describes a possible implementation of how to handle these events based on three tasks: one for the \emph{user calls}, one for the \emph{arriving segments} and one for the \emph{timers}. The role of each of the three tasks can be summarized as follow: User calls refer to functions, namely \texttt{open}, \texttt{close}, \texttt{abort}, \texttt{send} and \texttt{receive}, that can be called by the user to control the connection, send, or receive data. These functions can trigger transitions between the connection's states since they are intended to control the connection. In the arriving segments task, the received segments are being processed,
 and the corresponding messages are sent back. Transitions between states can be triggered on the reception of a segment. Finally, timers control the timeouts, for example, the retransmission timeout to retransmit a message or the time-wait timeout to close the connection after a specified amount of time elapsed. Thus, corresponding transitions to the timeout events can also be triggered by this task. A complete description of the protocol's specification can be found at the \emph{RFC 793} document \cite{rfc793}.
 
-The CycloneTCP implementation adopts the three-task-based model and the socket data structure. Thus, one task is dedicated to the user's code, one to the timers, and one to the processing of the incoming segments. The user can manipulate a socket through the TCP's library Application Programming Interface (API) to perform various TCP operations, such as data transmission.
+The CycloneTCP implementation adopts the three-task-based model and the socket data structure defined by the \cite{rfc793}. Thus, it has tasks dedicated to the user's code, to the timers, and to the processing of the incoming segments. Moreover, the user can manipulate a socket through the TCP's library Application Programming Interface (API) to perform various TCP operations, such as data transmission.
 
 \section{Specification techniques used}
 \label{sec:spec}
@@ -164,7 +164,7 @@ postconditions to subprograms\footnote{In Ada, a distinction is made between
   not. \emph{Subprogram} is the term that designates both.}.  These conditions
 can be checked during the execution of the program, just like assertions.
 
-SPARK~\cite{mccormick2015building} is the name of a platform that provides
+SPARK~\cite{mccormick_chapin_2015} is the name of a platform that provides
 formal verification for Ada. It uses the user-provided contracts and attempts
 to prove that the runtime checks cannot fail and that postconditions are
 established by the corresponding subprograms.  As formal verification for the
