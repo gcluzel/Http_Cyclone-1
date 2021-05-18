@@ -31,6 +31,7 @@
 \usepackage{xspace}
 
 \usepackage{listings}
+\usepackage{cleveref}
 
 \lstset{
     basicstyle=\ttfamily,
@@ -100,48 +101,17 @@ deductive verification.
 
 \section{Introduction}
 
-The usage of IoT devices has been put more within everyone's reach. Their
-vulnerability is a major cause for concern, and as their number
-increases, the number of attacks they suffer increases, putting at risk
-the security of the owner's data collected by the object. \todo{Try to find a
-relevant ref. I have found examples about the possibility to leak personnal data
-on Google home/Alexa}.
+By 2030 it is estimated that one trillion Internet of Things (IoT) devices will be deployed and be part of every aspect of our daily life~\cite{IoT_route:ARM_white_paper}. At the same time, it is made evident that security for such systems is a major challenge~\cite{Sec_IoT_Challenges:paper,Cyber_Systems_security:paper}. Any vulnerability in software libraries that are widely used by embedded systems can potentially open the door for compromising the security of billions of deployed IoT devices. In 2019, critical security vulnerabilities were discovered in a TCP implementation that has been used potentially by billions of IoT devices for more than 13 years \cite{zero_days_vuln:ARMIS_white_paper}, with some of them even allowing remote code execution.
 
-The core of the IoT devices is built on top of the TCP protocol~\cite{rfc793} as
-it is the most widely protocol used on the Internet, as the underlying protocol
-for application layers such as HTTP, FTP or TLS. TCP is based on the underlying
-IP protocol which is itself based on a link layer such as Ethernet. This
-stacking of protocols is referred to as the TCP/IP stack.
+Networking communication models define the processes of transferring information from one network component to another. Currently, the two most popular networking communication models are the TCP/IP (Transmission Control Protocol/Internet Protocol) \cite{TCP_IP:ietf_tutorial} and the OSI (Open System Interconnection) \cite{ISO:35.100} models. Layering is an essential design requirement for both models to achieve modularity, flexibility, and abstraction. Applications that only need to use the lower levels' functionality can drop all the unnecessary upper levels. \Cref{Fig:TcpStack} shows the various layers of the OSI model. Each layer supports a wide range of protocols that are compatible with the layer's specifications. The lowest layers, bottom layers in \Cref{Fig:TcpStack}, are more hardware-oriented, while the top layers are more software-specific. While the \emph{application} level has a wide range of protocols that can be used depending on the application specification, the \emph{transport} layer is heavily dependent on the two dominant protocols: Transmission Control Protocol (TCP) and User Datagram Protocol (UDP). Today, almost every networking application, including IoT devices, is using either the TCP or the UDP protocols to traffic data between the Network and the Application layers. %Thus, the reliability, assurance, and security of these protocols are of paramount importance for critical applications.
 
-Given the importance of the TCP protocol in network communications, some
-researchers have attempted to formalize the protocol to either prove key
-properties~\cite{smith1996formal} or even to fully prove the correctness of an
-implementation against a complete specification~\cite{ridge2008rigorous}.
-This latter implementation was performed in the HOL proof assistant, and while
-the authors note that it would be possible in theory to extract an
-implementation in Haskell from this work, this has not been adopted in practice.
-The formalization of TCP specification and verification of a TCP implementation
-face two difficulties:
-RFC 793 is written in English, leaving many parts underspecified; the TCP
-protocol is inherently concurrent which makes it complex to specify and verify.
-As a result, there is currently no formally verified implementation for TCP that
-is usable in industry.
+\input{OryxStack.tex}
 
-Other communication protocols have been formalized in recent years, leading to a
-formally verified implementation. The most prominent project in this area is the
-Everest project~\cite{bhargavan2017everest}, which led to a formally verified
-implementation in F* of TLS called miTLS~\cite{bhargavan2013implementing}. The
-approach of the Everest project is to implement TLS in F*, a programming
-language targeted at formal program verification.
-Note that miTLS still relies on an untrusted implementation of TCP, and thus
-could benefit from the results of our work.
-This approach is often difficult to adopt in industry, as codebases are evolved
-incrementally rather than replaced, both for economical and practical reasons.
+Existing research deals with formally verifying several protocols TCP/IP stack levels. For example, the work in \emph{miTLS} \cite{bhargavan2013implementing} formally verifies an SSL/TLS protocol implementation, and the work in \cite{Reiher_2020} uses a technology called RecordFlux to safely parse data segments. Given the reliance of the other software-level protocols on the TCP protocol, formalizing the its specification and verifying its implementation is critical. Achieving these two goals in practice is challening. This is mainly because TCP's specification, \cite{rfc793}, is written in English rather than any formal language, leaving many parts underspecified. Moreover, the TCP protocol is inherently concurrent, making it complex to specify and verify. Previous work focused on formalizing the protocol to either prove key properties \cite{smith1996formal} or fully verify the TCP protocol's specifications \cite{ridge2008rigorous} using the HOL proof assistant tool. While for the later work, the authors claim that it is possible from their formalization to extract an actual implementation in Haskell, this has not been achieved yet. At this point of writing, we are not aware of any formally verified TCP protocol implementation.
 
-Our approach in this work has been to incrementally evolve an existing TCP/IP
-stack in C by replacing parts of the code with formally verified code in SPARK.
-The stack chosen, CycloneTCP\footnote{\url{https://www.oryx-embedded.com/products/CycloneTCP.html}},
-a mature TCP/IP stack targeted at embedded processors with no Operating System.
+In this paper, we take a practical approach, where the security of an existing TCP/IP stack implementation written in ANSI C programming language is incrementally enhanced by replacing parts of its code with formally verified code in SPARK \cite{mccormick_chapin_2015}. SPARK 2014 is a programming language designed as a subset of the Ada language to produce highly reliable software through formal verification. 
+For this work, the CycloneTCP, a professional-grade embedded TCP/IP library developed by the Oryx Embedded company\footnote{\url{https://www.oryx-embedded.com/products/CycloneTCP.html}}. \Cref{Fig:TcpStack} shows the protocols implemented in the library. In this work, we focused on enhancing the TCP and socket components of the stack. The TCP implementation is meant to conform with the RFC 793 protocol specifications \cite{rfc793}. The quality of the C implementation hailed in the AMNESIA:33 report \cite{AMNESIA33} as one of the most resilient TCP/IP stack. Using a starting point, an existing well-tested and widely used TCP/IP implementation, the IoT industry can have an immediate benefit by adopting the proposed by this work security-enhanced version of this implementation. 
+
 We present the TCP protocol in section~\ref{sec:TCP} and then briefly the
 chosen stack, the Oryx Embedded one, in section~\ref{sec:stack}
 before presenting the specification techniques used in section~\ref{sec:spec}
@@ -150,32 +120,8 @@ formally implemented in SPARK the TCP user functions and how we hardened the
 user's API. Finally we end in section~\ref{sec:results} by showing the results
 of our work.
 
-
-
 \section{Overview of the TCP protocol specification}
 \label{sec:TCP}
-
-This section gives an overview of the TCP functional specification without going
-into unnecessary depth. A complete description of the protocol’s specification
-can be found at the RFC 793 document~\cite{rfc793}.
-
-Networking communication models define the processes of transferring information
-from one network component to another. Figure~\ref{Fig:TcpStack}
-shows an overview of the OSI model with its different layers.
-Layering is an essential design
-requirement for both models to achieve modularity, flexibility, and abstraction.
-Applications that only need to use the functionality of the lower levels can
-drop all the unnecessary upper levels. Furthermore, layering enables easier
-troubleshooting as the network's functionality is well-defined and split between
-the different layers. Each layer supports a wide range of protocols that are
-compatible with the layer's specifications. The lowest layers, bottom layers in
-Figure~\ref{Fig:TcpStack},
-are more hardware-oriented, while the top layers are more software specific.
-While the \emph{application} level
-has a wide range of protocols that can be used depending on the application
-specification, the \emph{transport} layer is heavily depended on the two
-dominant protocols: Transmission Control Protocol (TCP) and
-User Datagram Protocol (UDP).
 
 TCP is a connection-oriented protocol; a
 connection between the sender and the receiver must be established before
@@ -259,8 +205,6 @@ transitions to the timeout events can also be triggered by this task.
 
 \section{CycloneTCP library}
 \label{sec:stack}
-
-\input{OryxStack.tex}
 
 CycloneTCP is a professional-grade embedded TCP/IP library developed by the
 Oryx Embedded company. It provides several network protocols whose implementations
