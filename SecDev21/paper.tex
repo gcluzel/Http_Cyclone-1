@@ -109,8 +109,7 @@ Networking communication models define the processes of transferring information
 
 Existing research deals with formally verifying several protocols TCP/IP stack levels. For example, the work in \emph{miTLS} \cite{bhargavan2013implementing} formally verifies an SSL/TLS protocol implementation, and the work in \cite{Reiher_2020} uses a technology called RecordFlux to safely parse data segments. Given the reliance of the other software-level protocols on the TCP protocol, formalizing the its specification and verifying its implementation is critical. Achieving these two goals in practice is challening. This is mainly because TCP's specification, \cite{rfc793}, is written in English rather than any formal language, leaving many parts underspecified. Moreover, the TCP protocol is inherently concurrent, making it complex to specify and verify. Previous work focused on formalizing the protocol to either prove key properties \cite{smith1996formal} or fully verify the TCP protocol's specifications \cite{ridge2008rigorous} using the HOL proof assistant tool. While for the later work, the authors claim that it is possible from their formalization to extract an actual implementation in Haskell, this has not been achieved yet. At this point of writing, we are not aware of any formally verified TCP protocol implementation.
 
-In this paper, we take a practical approach, where the security of an existing TCP/IP stack implementation written in ANSI C programming language is incrementally enhanced by replacing parts of its code with formally verified code in SPARK \cite{mccormick_chapin_2015}. SPARK 2014 is a programming language designed as a subset of the Ada language to produce highly reliable software through formal verification. 
-For this work, the CycloneTCP, a professional-grade embedded TCP/IP library developed by the Oryx Embedded company\footnote{\url{https://www.oryx-embedded.com/products/CycloneTCP.html}}. \Cref{Fig:TcpStack} shows the protocols implemented in the library. In this work, we focused on enhancing the TCP and socket components of the stack. The TCP implementation is meant to conform with the RFC 793 protocol specifications \cite{rfc793}. The quality of the C implementation hailed in the AMNESIA:33 report \cite{AMNESIA33} as one of the most resilient TCP/IP stack. Using a starting point, an existing well-tested and widely used TCP/IP implementation, the IoT industry can have an immediate benefit by adopting the proposed by this work security-enhanced version of this implementation. 
+In this paper, we take a practical approach, where the security of an existing TCP/IP stack implementation written in ANSI C programming language is incrementally enhanced by replacing parts of its code with formally verified code in SPARK \cite{mccormick_chapin_2015}. SPARK 2014 is a programming language designed as a subset of the Ada language to produce highly reliable software through formal verification. For this work, the CycloneTCP, a professional-grade embedded TCP/IP library developed by the Oryx Embedded company \cite{CycloneTCP}. \Cref{Fig:TcpStack} shows the protocols supported by the library. This work focuses on the TCP and socket components of the stack. The library's TCP implementation is meant to conform with the RFC 793 protocol specifications \cite{rfc793}. The quality of the CycloneTCP is acknowledged by the AMNESIA:33 report \cite{AMNESIA33}, which classifies it as one of the most resilient TCP/IP stack. By using as a starting point such a well-tested and widely used TCP/IP implementation, the IoT industry can have an immediate benefit by adopting this work's security-enhanced version of the CycloneTCP library. 
 
 We present the TCP protocol in section~\ref{sec:TCP} and then briefly the
 chosen stack, the Oryx Embedded one, in section~\ref{sec:stack}
@@ -130,22 +129,12 @@ guarantees the delivery of all the messages and that they are delivered in the
 order they were sent. It also provides error-checking mechanisms to discard and
 recover any corrupted data.
 
-Initially described by the ``fathers of the Internet'' Vincent Cerf and Bob
-Kahn, the TCP protocol was standardized in 1981 in~\cite{rfc793}.
-Its sturdiness still makes it one of the most widely used protocols 40 years
-later. Indeed, almost any networking application is using either the TCP or the
-UDP protocols to traffic data between the Network and the Application layers.
-
 \input{Automaton.tex}
 
-\subsection{TCP state machine}
+%\subsection{TCP state machine}
 
-Generally, every TCP communication session will go through the following three
-phases (if no error occurs): 1)~opening the connection 2)~sending and receiving
-the data and 3)~closing the connection.
-
-The behavior of the three-phase communication can be described by the state
-machine in figure~\ref{Fig:statemachine}.
+Generally, every TCP communication session will go through the following three phases (if no error occurs): 1)~opening the connection 2)~sending and receiving
+the data and 3)~closing the connection. The behavior of the three-phase communication can be described by the state machine in \cref{Fig:statemachine}.
 
 An edge represents a state transition. A transition is either triggered by an
 explicit action, stated in italics format on the label's edge, for example,
