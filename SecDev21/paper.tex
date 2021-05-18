@@ -122,109 +122,29 @@ of our work.
 \section{Overview of the TCP protocol specification}
 \label{sec:TCP}
 
-TCP is a connection-oriented protocol; a
-connection between the sender and the receiver must be established before
-transmitting any data. Furthermore, TCP is a reliable protocol since it
-guarantees the delivery of all the messages and that they are delivered in the
-order they were sent. It also provides error-checking mechanisms to discard and
-recover any corrupted data.
-
 \input{Automaton.tex}
+
+TCP is a connection-oriented protocol; a connection between the sender and the receiver must be established before transmitting any data. Furthermore, TCP is a reliable protocol since it guarantees the delivery of all the messages and that they are delivered in the order, they were sent. It also provides error-checking mechanisms to discard and recover any corrupted data.
 
 %\subsection{TCP state machine}
 
-Generally, every TCP communication session will go through the following three phases (if no error occurs): 1)~opening the connection 2)~sending and receiving
-the data and 3)~closing the connection. The behavior of the three-phase communication can be described by the state machine in \cref{Fig:statemachine}.
-
-An edge represents a state transition. A transition is either triggered by an
-explicit action, stated in italics format on the label's edge, for example,
-\textit{Close}, or is triggered by the arrival of a specific flag/s.
-An edge-label in the format of $\frac{\ \ x \ \ }{\ \ y \ \ }$
-represents the associated flags transmitted with each transition, where $x$
-is either send or receive and $y$ refers to the actual
-flag/s transmitted in response to the action that caused the state-transition.
-An explicit action is either a user-triggered action (through the user's API)
-or an automatically performed action triggered by a timeout event. The flags are
-embedded in the header section of a transmitted segment and can be one of the
-following:
+Generally, every TCP communication session will go through the following three phases (if no error occurs): 1)~opening the connection, 2)~sending and receiving the data, and 3)~closing the connection. The behaviour of the three-phase communication can be described by the state machine given in \cref{Fig:statemachine}. An edge represents a state transition. A transition is either triggered by an explicit action, stated in italics format on the label's edge, for example, \textit{Close}, or is triggered by the arrival of a specific flag/s. An edge-label in the format of $\frac{\ \ x \ \ }{\ \ y \ \ }$ represents the associated flags transmitted with each transition, where $x$ is either send or receive and $y$ refers to the actual flag/s transmitted in response to the action that caused the state transition. An explicit action is either a user-triggered action (through the user's API) or an automatically performed action triggered by a timeout event. The flags are embedded in the header section of a transmitted segment and can be one of the following:
 \begin{itemize}
 \item \ack: the last message received by the sender is acknowledged.
 \item \syn: this flag is sent to establish a connection.
 \item \fin: this flag is sent to close the connection.
 \item \rst: this flag is sent to reset the connection, often when an error
-occurred in one or the other side.
+occurred on one or the other side.
 \end{itemize}
 
-The state machine in figure~\ref{Fig:statemachine} does not represent the
-complete protocol specification; for example, it does not reflect
-error-conditions or any actions which are not connected with the state changes.
-Rather, it gives an overview of all the possible states a TCP connection could
-reach over its lifetime.
+The state machine in \cref{Fig:statemachine} does not represent the complete protocol specification; for example, it does not reflect error conditions or any actions which are not connected with the state changes. Instead, it gives an overview of all the possible states a TCP connection could reach over its lifetime. Each state has a meaning. \slisten represents waiting for a connection request from any remote TCP and port. \ssynsent and \ssynrcv represent the initialization of the connection that ends when \sestab is reached. \sfwone, \sfwtwo, \sclosing, and \stimewait are a group of states that represents waiting for a connection termination request from remote TCP. \sclosew and \slastack represent waiting for a connection termination request from the local user. Finally, \sclosed represents no connection state at all.
 
-Each state has a meaning. \slisten represents waiting for a connection request
-from any remote TCP and port. \ssynsent and \ssynrcv represent the
-initialization of the connection, that ends when \sestab is reached.
-\sfwone, \sfwtwo, \sclosing and \stimewait are a group of states that represents
-waiting for a connection termination request from remote TCP. \sclosew and
-\slastack represent waiting for a connection termination request from local
-user. Finally, \sclosed represents no connection state at all.
+%\subsection{TCP Multitasking model}
 
+TCP is based on a multitasking model. Different tasks can interact and update the socket data structure, used to retain the status of a TCP connection, to handle the various events that can occur within a TCP session. The TCP norm, \cite{rfc793} , under Section "3.9. Event Processing" page 52, describes a possible implementation of how to handle these events based on three tasks: one for the \emph{user calls}, one for the \emph{arriving segments} and one for the \emph{timers}. The role of each of the three tasks can be summarized as follow: User calls refer to functions, namely \texttt{open}, \texttt{close}, \texttt{abort}, \texttt{send} and \texttt{receive}, that can be called by the user to control the connection, send, or receive data. These functions can trigger transitions between the connection's states since they are intended to control the connection. In the arriving segments task, the received segments are being processed,
+and the corresponding messages are sent back. Transitions between states can be triggered on the reception of a segment. Finally, timers control the timeouts, for example, the retransmission timeout to retransmit a message or the time-wait timeout to close the connection after a specified amount of time elapsed. Thus, corresponding transitions to the timeout events can also be triggered by this task. A complete description of the protocol's specification can be found at the \emph{RFC 793} document \cite{rfc793}.
 
-\subsection{TCP Multitasking model}
-
-Different tasks can interact and update the socket data structure to handle the
-various events that can occur within a TCP session. The TCP norm, under
-Section “3.9. Event Processing” page 52, describes a possible implementation
-of how to handle these events based on three tasks: one for the
-\emph{user calls}, one for the \emph{arriving segments} and one for the
-\emph{timers}.
-The role of each of the three tasks can be summarized as follow:
-User calls refer to functions, namely \texttt{open}, \texttt{close},
-\texttt{abort}, \texttt{send} and \texttt{receive}, that can be called
-by the user to control the connection, send, or receive data.
-These functions can trigger transitions between the connection's states since
-they are intended to control the connection.
-In the arriving segments task, the received segments are being processed,
-and the corresponding messages are sent back. Transitions between
-states can be triggered on the reception of a segment.
-Finally, timers control the timeouts, for example, the retransmission
-timeout to retransmit a message, or the time-wait timeout to close the
-connection after a specified amount of time elapsed. Thus, corresponding
-transitions to the timeout events can also be triggered by this task.
-
-\section{CycloneTCP library}
-\label{sec:stack}
-
-CycloneTCP is a professional-grade embedded TCP/IP library developed by the
-Oryx Embedded company. It provides several network protocols whose implementations
-are meant to conform with the Request for Comments (RFC) Internet standards.
-Figure~\ref{Fig:TcpStack} shows the protocols implemented in the library.
-These include the IPv4 or Ipv6 of the network layer, TCP and UDP of the transport
-layer and, among other, DHCP and HTTP of the application layer.
-In particular, the TCP implementation is conform with the RFC 793
-norm~\cite{rfc793}.
-
-The library is written in ANSI C, and it supports a large number of 32-bits
-embedded processors and a large number of Real-time Operating System (RTOS).
-Hence, a model based on multiple tasks has been adopted to implement the TCP
-protocol as described in the norm, with, in addition, complex cooperation
-mechanisms. A task is dedicated to the user code, another to the timers and the
-last is assigned to the processing of the incoming segments.
-It can also run on bare metal environment.
-
-In the CycloneTCP implementation, the socket data structure is used to retain
-the status of a TCP connection. Furthermore, a socket can be
-manipulated by the user through the TCP's library Application Programming
-Interface (API) to perform various TCP operations, such as the transmission of
-data.
-
-The quality of the C implementation hailed in the AMNESIA:33 report~\cite{AMNESIA33}
-as one of the most resilient TCP/IP stack. This gives a really good assurance
-in the code and it strengthens the confidence that we can have in a formally
-verified code running inside the library environment.
-\todo{Add anything else relevant about the CycloneTCP library}.
-
-
+The CycloneTCP implementation adopts the three-task-based model and the socket data structure. Thus, one task is dedicated to the user's code, one to the timers, and one to the processing of the incoming segments. The user can manipulate a socket through the TCP's library Application Programming Interface (API) to perform various TCP operations, such as data transmission.
 
 \section{Specification techniques used}
 \label{sec:spec}
