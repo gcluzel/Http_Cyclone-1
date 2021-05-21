@@ -167,7 +167,7 @@ The verification of the entire functional specification of the \emph{CycloneTCP}
 
 Ada and SPARK offer an easy-to-use mechanism for interfacing with C code \cite{}. The mechanism allows C-written function to be called by Ada/SPARK code and vice versa and for representing shared data objects. The memory representations of a shared data object must be the same in both the C and the SPARK code. For instance, if a C function is called with a 32-bits integer argument, the SPARK interface of this function should also be called with a 32-bits integer argument. It is the responsibility of the user to ensure this. 
 
-Although formal verification can only be applied to the SPARK translated code,  pre- and post-conditions can be attached to C functions interfaced in SPARK to allow reasoning about the side effects of calling these functions by the SPARK code. Since the functional specification of these contracts can not be proved, it is the role of the programmer to ensure their correctnes.
+Although formal verification can only be applied to the SPARK translated code,  pre- and post-conditions can be attached to C functions interfaced in SPARK to allow reasoning about the side effects of calling these functions by the SPARK code. Since the functional specification of these contracts can not be proved, it is the programmer's role to ensure their correctness.
 
 \todo[inline]{KG: fixed up to here}
 
