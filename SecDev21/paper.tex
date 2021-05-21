@@ -72,7 +72,7 @@
 
 \begin{document}
 
-\title{Verification of a TCP/IP stack}
+\title{Layered Formal Verification of an Industrial TCP/IP Stack}
 
 \author{%
 \IEEEauthorblockN{Guillaume Cluzel}
@@ -109,8 +109,11 @@ Networking communication models define the processes of transferring information
 
 Existing research deals with formally verifying several protocols TCP/IP stack levels. For example, the work in \emph{miTLS} \cite{bhargavan2013implementing} formally verifies an SSL/TLS protocol implementation, and the work in \cite{Reiher_2020} uses a technology called RecordFlux to safely parse data segments. Given the reliance of the other software-level protocols on the TCP protocol, formalizing the its specification and verifying its implementation is critical. Achieving these two goals in practice is challenging. This is mainly because TCP's specification, \cite{rfc793}, is written in English rather than any formal language, leaving many parts underspecified. Moreover, the TCP protocol is inherently concurrent, making it complex to specify and verify. Previous work focused on formalizing the protocol to either prove key properties \cite{smith1996formal} or fully verify the TCP protocol's specifications \cite{ridge2008rigorous} using the HOL proof assistant tool. While for the later work, the authors claim that it is possible from their formalization to extract an actual implementation in Haskell, this has not been achieved yet. At this point of writing, we are not aware of any formally verified TCP protocol implementation.
 
+
 In this paper, we take a practical approach, where the security of an existing TCP/IP stack implementation written in ANSI C programming language is incrementally enhanced by replacing parts of its code with formally verified code in SPARK \cite{mccormick_chapin_2015}. SPARK 2014 is a programming language designed as a subset of the Ada language to produce highly reliable software through formal verification. For this work, the CycloneTCP, a professional-grade embedded TCP/IP library developed by the Oryx Embedded company \cite{CycloneTCP}. \Cref{Fig:TcpStack} shows the protocols supported by the library. This work focuses on the TCP and socket components of the stack. The library's TCP implementation is meant to conform with the RFC 793 protocol specifications \cite{rfc793}. The quality of the CycloneTCP is acknowledged by the AMNESIA:33 report \cite{AMNESIA33}, which classifies it as one of the most resilient TCP/IP stack. By using as a starting point such a well-tested and widely used TCP/IP implementation, the IoT industry can have an immediate benefit by adopting this work's security-enhanced version of the CycloneTCP library. 
+
 \todo[inline]{KG:pending contributions list and fixing the next paragraph. Will be fixed when the rest of the paper is finalized.}
+
 We present the TCP protocol in section~\ref{sec:TCP} and then briefly the
 chosen stack, the Oryx Embedded one, in section~\ref{sec:stack}
 before presenting the specification techniques used in section~\ref{sec:spec}
@@ -153,7 +156,7 @@ The CycloneTCP implementation adopts the three-task-based model and the socket d
 
 Ada is a general-purpose, procedural programming language that puts great emphasis on the safety and correctness of the program. Some of the safety characteristics of the language are its strong typing system and its extensive compile-time and runtime checks. Common C programming vulnerabilities like using unsafe pointers or improper null termination of strings can not exist in an Ada program, while issues like buffer overflow or integer overflow can be dynamically captured by Ada’s runtime checks and dealt with via exception handlers. Furthermore, Ada introduced contracts, such as post- and pre-conditions, as part of the language’s standard syntax. Such contracts are vital for explicitly expressing software and verification requirements in the source code to allow for static analyzers or runtime checks to verify that the stated requirements are met.
 
-By subsetting Ada, the SPARK programming language \cite{mccormick_chapin_2015} emerged to provide the largest possible subset of Ada, which is suitable for functional specification and static verification. For instance, in SPARK, expressions should be free from side effects, and aliasing is forbidden (no two variables should share the exact memory location or overlap in memory), including when using pointers thanks to the use of an ownership policy~\cite{dross2020recursive}. 
+By subsetting Ada, the SPARK programming language \cite{mccormick_chapin_2015} emerged to provide the largest possible subset of Ada, which is suitable for functional specification and static verification. For instance, in SPARK, expressions should be free from side effects, and aliasing is forbidden (no two variables should share the exact memory location or overlap in memory), including when using pointers thanks to the use of an ownership policy~\cite{dross2020recursive}.
 
 \emph{GNATprove} \cite{GNATProve:users_manual} is the platform that provides formal verification for SPARK through two kinds of analysis. The first enables flow analysis to check the initialization of variables, look at data dependencies between inputs and outputs of subprograms, and detects unused assignments and unmodified variables. The second uses deductive verification to generate verification conditions for SMT solvers via a weakest-precondition calculus to detect possible runtime errors and violations of functional contracts.
 
@@ -220,7 +223,7 @@ to \spark{TCP_STATE_CLOSED} after the call.
 \section{Conformance to the TCP protocol}
 \label{sec:verif}
 
-The reader can refer to the code at \url{https://github.com/AdaCore/Http_Cyclone}.
+% The reader can refer to the code at \url{https://github.com/AdaCore/Http_Cyclone}.
 
 
 \subsection{Extracting a specification from the TCP norm}
