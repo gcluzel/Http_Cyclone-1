@@ -169,11 +169,6 @@ Ada and SPARK offer an easy-to-use mechanism for interfacing with C code \cite{}
 
 Although formal verification can only be applied to the SPARK translated code,  pre- and post-conditions can be attached to C functions interfaced in SPARK to allow reasoning about the side effects of calling these functions by the SPARK code. Since the functional specification of these contracts can not be proved, it is the programmer's role to ensure their correctness. Interfacing C and SPARK code can be error-prone if it is not done carefully. \Cref{sec:verif} discusses how to mitigate this issue effectively.
 
-Interfacing C and SPARK code is a great opportunity to plug our work in an
-existing library, but it is also be a source of errors if it is not done
-carefully. In section~\ref{sec:verif} it is explain how we have dealt with these
-problems to ensure the quality of our work.
-
 \todo[inline]{KG: fixed up to here}
 
 \subsection{Dealing with pointers}
