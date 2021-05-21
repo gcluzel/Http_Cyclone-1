@@ -166,21 +166,16 @@ By subsetting Ada, the SPARK programming language \cite{mccormick_chapin_2015} e
 
 The verification of the entire functional specification of the \emph{CycloneTCP} library is beyond the scope of this work. Instead, the aim is to demonstrate how the use of SPARK can provide significant security hardening to widely used C-written libraries. Thus, this work focuses on the hardening of the TCP library areas that its original authors designated as the most vulnerable or crucial to conform to their functional specifications, namely, the Application Programming Interface (API). This mainly falls under two categories: a)  hardening the user's API to enforce its correct usage by the users, discussed in \Cref{sec:API}, and b) proving the conformance to the protocol's functional specification for the translated code, discussed in \Cref{sec:verif}.
 
+Ada and SPARK offer an easy-to-use mechanism for interfacing with C code \cite{}. The mechanism allows C-written function to be called by Ada/SPARK code and vice versa and for representing shared data objects. The memory representations of a shared data object must be the same in both the C and the SPARK code. For instance, if a C function is called with a 32-bits integer argument, the SPARK interface of this function should also be called with a 32-bits integer argument. It is the responsibility of the user to ensure this. 
+
 \todo[inline]{KG: fixed up to here}
 
-Hopefully, SPARK integrates a mechanism to interface C code. No verification are
+No verification are
 performed on the C code, but pre- and postconditions can be attached to
 subprograms and they can be called in SPARK code.
 The functional specification are not proved, thus it is the role of the
 programmer to ensure the correctness of the contracts.
 
-The types in SPARK can be more expressive than the types in C which adds more
-safety to the SPARK code.
-But the C and the SPARK code can share objects and it is essential that the
-memory representations of an object are the same in the C and in the SPARK side.
-For instance, if a C function is supposed to be called with a 32-bits integer,
-it is the responsibility of the programmer to ensure that the function is
-actually called with a 32-bits integer in the SPARK code.
 
 Interfacing C and SPARK code is a great opportunity to plug our work in an
 existing library, but it is also be a source of errors if it is not done
