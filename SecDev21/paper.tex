@@ -285,6 +285,8 @@ true due to the change of state, it is triggered.
 
 % Yannick: the above final sentence is unclear: what is triggered?
 
+% Yannick: the caption below used the term "user-task related function" which is used nowhere else
+
 \begin{algorithm}[t]
     \caption{Function to compute the possible state after the completion of a
 particular event that is requested by a user-task related function.}
@@ -309,6 +311,14 @@ particular event that is requested by a user-task related function.}
 \end{algorithmic}
 \end{algorithm}
 
+% Yannick: the whole explanation is unclear. We should rephrase to explain that:
+% - a suitable contract is added to function \spark{TCP_Wait_For_Events}
+% - to make sure this contract is correct, we implement a ghost procedure
+%   \spark{TCP_Wait_For_Events_Proof} as shown in Algorithm 1, that models
+%   the possible chain of events that occur while waiting, with the same contract
+%   as \spark{TCP_Wait_For_Events}. This procedure is proved automatically
+%   without even a loop invariant thanks to loop unrolling in GNATprove.
+
 An event is considered to be true or not depending on the state of the socket.
 This computation is done by the function \spark{TCP_Update_Events}. We have put
 a contract on it, which is proved to be correct by SPARK. Then we can write a
@@ -329,7 +339,7 @@ has a postcondition.
 
 \subsection{Symbolic execution to extract contracts}
 
-Rewriting the part that process the incoming segments was out of the scope of
+Rewriting the part that processes the incoming segments was out of the scope of
 this work. Instead, we have opted for the use of symbolic execution on the
 original CycloneTCP C code.
 Symbolic execution is a mean to execute programs with symbolic values rather
@@ -337,7 +347,7 @@ than concrete values. Symbolic execution has already been successfully
 used with other verification methods.
 Indeed, in~\cite{vanoverberghe2008using} the authors present how to use symbolic
 execution to improve deductive verification, and in~\cite{kassios2012comparing}
-the authors explain that symbolic execution can be good at infering contracts.
+the authors explain that symbolic execution can be good at inferring contracts.
 For our work, KLEE has been used. It is built on top of LLVM as it takes LLVM
 bytecode in input and works well with C code thanks to a very simple interface.
 
@@ -374,12 +384,12 @@ The first step in order to extract contracts was to read the state machine to
 know all the possible transitions that can be done by the reception of a flag,
 and adapt it to
 the subtleties of CycloneTCP. The next step is to write a driver to run KLEE and
-know if the contracts that we have infered are correct or not.
+know if the contracts that we have inferred are correct or not.
 A simplified example is shown in figure~\ref{code:kleedriver}. The first lines
 create a symbolic incoming segment to process as well as a symbolic socket.
 At line~\ref{code:kleedriver:tcpProcessSegment} the function that processes the
 segment is called. It is followed at line~\ref{code:kleedriver:assert} by a KLEE
-builtin that check if an assert is valid for all the symbolic paths
+builtin that checks if an assert is valid for all the symbolic paths
 explored before.
 
 Once the contract is validated by KLEE, it can be copied out on the SPARK
@@ -389,18 +399,14 @@ challenge has been solved and the function
 makes possible the verification of the functional correctness of the TCP user
 functions thanks to SPARK.
 
-
-
 \section{Hardening the user's API}
 \label{sec:API}
 
-It appears that lot of programmers do not correctly use the socket API that is
-provided by the library. Providing verified user functions for TCP is not enough
-to guarantee the safety of software if the users do not correctly use them.
-An important part of the work was to ensure that code that uses the socket API's
-functions are correctly called. By ``correctly'' we mean: 1)~the functions
-are called with respect to a defined order and 2)~the return code is checked
-before continuing the processing.
+A common problem faced by users of the CycloneTCP library is the need to
+properly chain calls of the Socket API, in a way that respects the TCP
+automaton. This entails verifying that 1)~the functions are called with respect
+to a defined order and 2)~the return code is checked before continuing the
+processing.
 
 \subsection{Enforcing the correct order of API functions}
 
@@ -408,9 +414,9 @@ The TCP protocol implies a specific order such that the user can call the API's
 functions without breaking the functional specification of the protocol. This
 order also is being conveyed by the protocol's state machine given in
 figure~\ref{Fig:statemachine}.
-Ada's pre- and postconditions are a powerful tool to express such inter-function
+Ada's preconditions and postconditions are a powerful tool to express such inter-function
 dependencies, while SPARK technology can be used to guarantee that the
-assertions always hold. Thus, pre- and postconditions were introduced to model
+assertions always hold. Thus, preconditions and postconditions were introduced to model
 a partial order on the calls to the API's functions.
 
 \begin{figure}
@@ -476,12 +482,12 @@ precondition.
 
 Thanks to the pointer ownership policy adopted by SPARK and detailed in
 section~\ref{sec:pointers}, we have found that a memory leak can happen when
-the connection have been closed and the buffer are cleaning.
+the connection has been closed and the buffer are cleaning.
 
 \subsubsection{Violation of the TCP protocol}
 
-Another very interesting and very subtle bug have been found thanks to SPARK is
-reproduced in the snippet bellow.
+A subtle bug found thanks to SPARK is
+reproduced in the snippet below.
 
 \begin{lstlisting}[language=Ada, basicstyle=\footnotesize\ttfamily,
                     numbers=left, numberstyle=\tiny, escapechar=\%]
@@ -528,20 +534,21 @@ case Sock.State is
 \end{lstlisting}
 
 In this scenario, after the call to \spark{Tcp_Send}, when the error cases have
-been filter, the state of the socket can either be \sestab or \sclosew. The call
-at line~\ref{bugProg:tcpWaitForEvents} and now the state of the socket can be
-still be \sestab or \sclosew, or if a \rst flag has been received when the mutex
-was released, the state can be \sclosed too.
+been filtered, the state of the socket can either be \sestab or \sclosew. After the call
+at line~\ref{bugProg:tcpWaitForEvents}, the state of the socket can
+still be \sestab or \sclosew, or it can be \sclosed if a \rst flag has been received when the mutex
+was released.
 At line~\ref{bugProg:tcpWaitForEventsPost}, a \fin segment is sent, which does
 not modify the state of the socket. Finally, at line~\ref{bugProg:tcpChangeState}
 we try to jump to the state \sfwone and thus the transitions $\text{\sclosew}
 \rightarrow \text{\sfwone}$ and $\text{\sclosed} \rightarrow \text{\sfwone}$ are
 possible.
 
-But these transition are not allowed by the norm, and thus not allowed by the
+But these transitions are not allowed by RFC 793, and thus not allowed by the
 precondition of \spark{TCP_Change_State}. The problem is detected by SPARK and a fix
-has been proposed.
+has been applied to the SPARK and C implementations of CycloneTCP.
 
+% The above is uncler, the transitions from CLOSED and CLOSED-WAIT are allowed, it's only the transition from ESTABLISHED which is not allowed.
 
 \subsection{Verified parts}
 
@@ -549,11 +556,13 @@ For achieving this verification, 50 subprograms have been translated from C to
 SPARK. This accounts for \np{2266} lines of code of which \np{1165} are logical
 code to write and prove the specifications.
 
+% above: need time to prove automatically with GNATprove with the spec of your laptop (num of cores, amount of memory)
+
 \section{Conclusion and future work}
 
 The use of SPARK for the verification of the TCP protocol has given good
 results. It has helped to find bugs in the existing implementation. But more
-than finding bugs, the interest of this work lie in the face that it is a big
+than finding bugs, the interest of this work lie in the face that it is a
 step toward a secure implementation. It has been proved by the tool GNATprove
 that our implementation is free of run-time errors and that all the transitions
 in the TCP state machine are done with respect to the norm.
@@ -574,6 +583,10 @@ Our verification of the TCP protocol only focuses on the validity of the
 transitions in the TCP state machine, but some other properties are formulated
 in RFC 793, and could be verified in the implementation to make it even
 more robust.
+
+% examples of such properties?
+
+% ambition for industrial use?
 
 \bibliographystyle{IEEEtran}
 \bibliography{biblio}
