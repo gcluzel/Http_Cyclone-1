@@ -101,15 +101,15 @@ deductive verification.
 
 \section{Introduction}
 
-By 2030 it is estimated that one trillion Internet of Things (IoT) devices will be deployed and be part of every aspect of our daily life~\cite{IoT_route:ARM_white_paper}. At the same time, it is made evident that security for such systems is a major challenge~\cite{Sec_IoT_Challenges:paper,Cyber_Systems_security:paper}. Any vulnerability in software libraries that are widely used by embedded systems can potentially open the door for compromising the security of billions of deployed IoT devices. In 2019, critical security vulnerabilities were discovered in a TCP implementation that has been used by billions of IoT devices for more than 13 years~\cite{zero_days_vuln:ARMIS_white_paper}, some of them allowing remote code execution.
+By 2030 it is estimated that one trillion Internet of Things (IoT) devices will be deployed and be part of every aspect of our daily life~\cite{IoT_route:ARM_white_paper}. At the same time, it is made evident that security for such systems is a major challenge~\cite{Sec_IoT_Challenges:paper,Cyber_Systems_security:paper}. Any vulnerability in software libraries that are widely used by embedded systems can potentially open the door for compromising the security of billions of deployed IoT devices. Researchers have shown that such vulnerabilities exist: in 2019, critical security vulnerabilities were discovered in a TCP implementation that has been used by billions of IoT devices for more than 13 years~\cite{zero_days_vuln:ARMIS_white_paper}, some of them allowing remote code execution.
 
 Networking communication models define the processes of transferring information from one network component to another. Currently, the two most popular networking communication models are the TCP/IP (Transmission Control Protocol/Internet Protocol) \cite{TCP_IP:ietf_tutorial} and the OSI (Open System Interconnection) \cite{ISO:35.100} models. Layering is an essential design requirement for both models to achieve modularity, flexibility, and abstraction. Applications that only need to use the lower levels' functionality can drop all the unnecessary upper levels. \Cref{Fig:TcpStack} shows the various layers of the OSI model. Each layer supports a wide range of protocols that are compatible with the layer's specifications. The lowest layers, bottom layers in \Cref{Fig:TcpStack}, are more hardware-oriented, while the top layers are more software-specific. While the \emph{application} level has a wide range of protocols that can be used depending on the application specification, the \emph{transport} layer is heavily dependent on the two dominant protocols: Transmission Control Protocol (TCP) and User Datagram Protocol (UDP). Today, almost every networking application, including IoT devices, is using either the TCP or the UDP protocols to traffic data between the Network and the Application layers. %Thus, the reliability, assurance, and security of these protocols are of paramount importance for critical applications.
 
 \input{OryxStack.tex}
 
-Existing research deals with formally verifying several protocols of TCP/IP stack levels. Early work formalized the TCP protocol to prove some key properties of the protocol itself~\cite{smith1996formal}. More recently, researchers have formally specified TCP, UDP and the Sockets API in HOL~\cite{tcp2005sigcomm,ridge2008rigorous} and used the resulting specification for testing existing libraries. Others have formally specified and implemented the SSL/TLS protocol in F*\cite{bhargavan2013implementing}, and integrated the resulting implementation in existing libraries. To the best of our knowledge, no prior work attempted to formally verify an implementation of TCP, although the authors of~\cite{ridge2008rigorous} suggest that it would possible to extract an actual implementation in Haskell from their specification.
+Existing research has dealt with formally verifying several protocols of TCP/IP stack levels. Early work formalized the TCP protocol to prove some key properties of the protocol itself~\cite{smith1996formal}. More recently, researchers have formally specified TCP, UDP and the Sockets API in HOL~\cite{tcp2005sigcomm,ridge2008rigorous} and used the resulting specification for testing existing libraries. Others have formally specified and implemented the SSL/TLS protocol in F*\cite{bhargavan2013implementing}, and integrated the resulting implementation in existing libraries. To the best of our knowledge, no prior work attempted to formally verify an implementation of TCP, although the authors of~\cite{ridge2008rigorous} suggest that it would possible to extract an actual implementation in Haskell from their specification.
 
-In this paper, we take a practical approach, where the security of an existing TCP/IP stack implementation written in ANSI C programming language is incrementally enhanced by replacing parts of its code with formally verified code in SPARK~\cite{mccormick_chapin_2015}, a subset of the Ada programming language supported by formal verification tools. We chose CycloneTCP, a professional-grade embedded TCP/IP library developed by the Oryx Embedded company~\cite{CycloneTCP}. \Cref{Fig:TcpStack} shows the protocols supported by the library. This work focuses on the TCP and socket components of the stack. The library's TCP implementation is meant to conform with the RFC 793 protocol specifications \cite{rfc793}. The quality of the CycloneTCP is acknowledged by the AMNESIA:33 report \cite{AMNESIA33}, which classifies it as one of the most resilient TCP/IP stack.
+In this paper, we take a practical approach, where the security of an existing TCP/IP stack implementation written in ANSI C programming language is incrementally enhanced by replacing parts of its code with formally verified code in SPARK~\cite{mccormick_chapin_2015}, a subset of the Ada programming language supported by formal verification tools. We chose CycloneTCP, a professional-grade open source embedded TCP/IP library developed by the Oryx Embedded company~\cite{CycloneTCP}. \Cref{Fig:TcpStack} shows the protocols supported by the library. This work focuses on the TCP and Socket components of the stack. The library's TCP implementation is meant to conform with the RFC 793 protocol specifications~\cite{rfc793}. The quality of the CycloneTCP is acknowledged by the AMNESIA:33 report \cite{AMNESIA33}, which classifies it as one of the most resilient TCP/IP stack.
 
 \todo[inline]{KG:pending contributions list and fixing the next paragraph. Will be fixed when the rest of the paper is finalized.}
 
@@ -130,7 +130,10 @@ TCP is a connection-oriented protocol; a connection between the sender and the r
 
 %\subsection{TCP state machine}
 
-Generally, every TCP communication session will go through the following three phases (if no error occurs): 1)~opening the connection, 2)~sending and receiving the data, and 3)~closing the connection. The behavior of the three-phase communication can be described by the state machine given in \cref{Fig:statemachine}. An edge represents a state transition. A transition is either triggered by an explicit action, stated in italics format on the label's edge, for example, \textit{Close}, or is triggered by the arrival of specific flags. An edge-label in the format of $\frac{\ \ x \ \ }{\ \ y \ \ }$ represents the associated flags transmitted with each transition, where $x$ is either send or receive and $y$ refers to the actual flags transmitted in response to the action that caused the state transition. An explicit action is either a user-triggered action (through the user's API) or an action automatically triggered by a timeout event. The flags are embedded in the header section of a transmitted segment and can be one of the following:
+Generally, every TCP communication session will go through the following three phases (if no error occurs): 1)~opening the connection, 2)~sending and receiving the data, and 3)~closing the connection. The behavior of the three-phase communication can be described by the state machine given in \cref{Fig:statemachine}. An edge represents a state transition.
+An edge-label in the format of $\frac{\ \ x \ \ }{\ \ y \ \ }$ represents the actions associated to the state transition, where $x$ is triggering the transition, and $y$ is produced by the transition.
+The trigger $x$ is either an explicit action like \textit{Close}, or the arrival of specific flags, while $y$ always represents the flags transmitted in response to the action that caused the state transition, when present.
+An explicit action is either a user-triggered action (through the user's API) or an action automatically triggered by a timeout event. The flags are embedded in the header section of a transmitted segment and can be one of the following:
 \begin{itemize}
 \item \ack: the last message received by the sender is acknowledged.
 \item \syn: this flag is sent to establish a connection.
@@ -139,69 +142,67 @@ Generally, every TCP communication session will go through the following three p
 occurred on one or the other side.
 \end{itemize}
 
-The state machine in \cref{Fig:statemachine} does not represent the complete protocol specification; for example, it does not reflect error conditions or any actions which are not connected with the state changes. Instead, it gives an overview of all the possible states a TCP connection could reach over its lifetime. Each state has a meaning. \slisten represents waiting for a connection request from any remote TCP and port. \ssynsent and \ssynrcv represent the initialization of the connection that ends when \sestab is reached. \sfwone, \sfwtwo, \sclosing, and \stimewait are a group of states that represents waiting for a connection termination request from remote TCP. \sclosew and \slastack represent waiting for a connection termination request from the local user. Finally, \sclosed represents no connection state at all.
+The state machine in \cref{Fig:statemachine} does not represent the complete protocol specification; for example, it does not reflect error conditions or any actions which are not connected with the state changes. Instead, it gives an overview of all the possible states a TCP connection could reach over its lifetime. Each state has a meaning. \slisten represents waiting for a connection request from any remote TCP and port. \ssynsent and \ssynrcv represent the initialization of the connection that ends when \sestab is reached. \sfwone, \sfwtwo, \sclosing, and \stimewait are a group of states that represent waiting for a connection termination request from the remote TCP. \sclosew and \slastack represent waiting for a connection termination request from the local user. Finally, \sclosed represents no connection state at all.
 
 %\subsection{TCP Multitasking model}
 
-TCP is based on a multitasking model. Different tasks can interact and update the socket data structure, used to retain the status of a TCP connection, to handle the various events that can occur within a TCP session. The TCP norm, \cite{rfc793} , under Section "3.9. Event Processing" page 52, describes a possible implementation of how to handle these events based on three tasks: one for the \emph{user calls}, one for the \emph{arriving segments} and one for the \emph{timers}. The role of each of the three tasks can be summarized as follow: User calls refer to functions, namely \texttt{open}, \texttt{close}, \texttt{abort}, \texttt{send} and \texttt{receive}, that can be called by the user to control the connection, send, or receive data. These functions can trigger transitions between the connection's states since they are intended to control the connection. In the arriving segments task, the received segments are being processed,
-and the corresponding messages are sent back. Transitions between states can be triggered on the reception of a segment. Finally, timers control the timeouts, for example, the retransmission timeout to retransmit a message or the time-wait timeout to close the connection after a specified amount of time elapsed. Thus, corresponding transitions to the timeout events can also be triggered by this task. A complete description of the protocol's specification can be found at the \emph{RFC 793} document \cite{rfc793}.
+TCP is based on a multitasking model. Different tasks can interact and update the socket data structure, used to retain the status of a TCP connection, to handle the various events that can occur within a TCP session. RFC 793, under Section ``3.9. Event Processing'' page 52, describes a possible implementation of how to handle these events based on three tasks: one for the \emph{user calls}, one for the \emph{arriving segments} and one for the \emph{timers}. The role of each of the three tasks can be summarized as follows. User calls refer to functions, namely \texttt{open}, \texttt{close}, \texttt{abort}, \texttt{send} and \texttt{receive}, that can be called by the user to control the connection, send, or receive data. These functions can trigger transitions between the connection's states since they are intended to control the connection. In the arriving segments task, the received segments are being processed,
+and the corresponding messages are sent back. Transitions between states can be triggered on the reception of a segment. Finally, timers control the timeouts, for example, the retransmission timeout to retransmit a message or the time-wait timeout to close the connection after a specified amount of time elapsed. Thus, corresponding transitions to the timeout events can also be triggered by this task. A complete description of the protocol's specification can be found in the RFC 793 document~\cite{rfc793}.
 
-The CycloneTCP implementation adopts the three-task-based model and the socket data structure defined by the \cite{rfc793}. Thus, it has tasks dedicated to the user's code, to the timers, and to the processing of the incoming segments. Moreover, the user can manipulate a socket through the TCP's library Application Programming Interface (API) to perform various TCP operations, such as data transmission.
+The CycloneTCP implementation adopts the three-task-based model and the socket data structure defined by the RFC 793. Thus, it has tasks dedicated to the user's code, to the timers, and to the processing of incoming segments. Moreover, the user can manipulate a socket through the TCP's library Application Programming Interface (API) to perform various TCP operations, such as data transmission.
 
 \section{Specification techniques used}
 \label{sec:spec}
 
 \subsection{The SPARK programming language}
 
-Ada is a general-purpose, procedural programming language that puts great emphasis on the safety and correctness of the program. Some of the safety characteristics of the language are its strong typing system and its extensive compile-time and runtime checks. Common C programming vulnerabilities like using unsafe pointers or improper null termination of strings can not exist in an Ada program, while issues like buffer overflow or integer overflow can be dynamically captured by Ada’s runtime checks and dealt with via exception handlers. Furthermore, Ada introduced contracts, such as post- and pre-conditions, as part of the language’s standard syntax. Such contracts are vital for explicitly expressing software and verification requirements in the source code to allow for static analyzers or runtime checks to verify that the stated requirements are met.
+Ada is a general-purpose, procedural programming language that puts great emphasis on the safety and correctness of the program. Some of the safety characteristics of the language are its strong typing system and its extensive compile-time and runtime checks. Common C programming vulnerabilities like using unsafe pointers or improper null termination of strings cannot exist in an Ada program, while issues like buffer overflow or integer overflow can be dynamically captured by Ada’s runtime checks and dealt with via exception handlers. Furthermore, Ada introduced contracts, such as preconditions and postconditions, as part of the language’s standard syntax. Such contracts are vital for explicitly expressing software and verification requirements in the source code to allow for static analyzers or runtime checks to verify that the stated requirements are met.
 
 By subsetting Ada, the SPARK programming language \cite{mccormick_chapin_2015} emerged to provide the largest possible subset of Ada, which is suitable for functional specification and static verification. For instance, in SPARK, expressions should be free from side effects, and aliasing is forbidden (no two variables should share the exact memory location or overlap in memory), including when using pointers thanks to the use of an ownership policy~\cite{dross2020recursive}.
 
-\emph{GNATprove} \cite{GNATProve:users_manual} is the platform that provides formal verification for SPARK through two kinds of analysis. The first enables flow analysis to check the initialization of variables, look at data dependencies between inputs and outputs of subprograms, and detects unused assignments and unmodified variables. The second uses deductive verification to generate verification conditions for SMT solvers via a weakest-precondition calculus to detect possible runtime errors and violations of functional contracts.
+\emph{GNATprove} \cite{GNATProve:users_manual} is the tool that provides formal verification for SPARK through two kinds of analyses. The first enables flow analysis to check the initialization of variables, look at data dependencies between inputs and outputs of subprograms, and detects unused assignments and unmodified variables. The second uses deductive verification to generate verification conditions for SMT solvers via a weakest-precondition calculus to detect possible runtime errors and violations of functional contracts.
 
 
 
 \subsection{Interfacing SPARK and C code}
 
-The verification of the entire functional specification of the \emph{CycloneTCP} library is beyond the scope of this work. Instead, the aim is to demonstrate how the use of SPARK can provide significant security hardening to widely used C-written libraries. Thus, this work focuses on the hardening of the TCP library areas that its original authors designated as the most vulnerable or crucial to conform to their functional specifications, namely, the Application Programming Interface (API). This mainly falls under two categories: a)  hardening the user's API to enforce its correct usage by the users, discussed in \Cref{sec:API}, and b) proving the conformance to the protocol's functional specification for the translated code, discussed in \Cref{sec:verif}.
+The verification of the entire functional specification of the \emph{CycloneTCP} library is beyond the scope of this work. Instead, the aim is to provide significant security hardening to mostly-C libraries by selective use of SPARK. Thus, this work focuses on the hardening of the TCP library areas that its original authors designated as the most vulnerable or crucial to conform to their functional specifications, namely, the Application Programming Interface (API). This mainly falls under two categories: a) proving the conformance to the protocol's functional specification for the translated code, discussed in \Cref{sec:verif}, and b) hardening the user's API to enforce its correct usage by users, discussed in \Cref{sec:API}.
 
-Ada and SPARK offer an easy-to-use mechanism for interfacing with C code. The mechanism allows  C-written functions to be called by Ada/SPARK code and vice versa, via function bindings \cite{Ada_C_Binding}, and for the representation of shared data objects by the two languages. The memory representations of a shared data object must be the same in both the C and the SPARK code. For instance, if a C function is called with a 32-bits integer argument, the SPARK binding of this function should also be called with a 32-bits integer argument. It is the responsibility of the user to ensure this. 
+Ada and SPARK offer an easy-to-use mechanism for interfacing with C code \cite{}. The mechanism allows C-written function to be called by Ada/SPARK code and vice versa and for representing shared data objects. The memory representations of a shared data object must be the same in both the C and the SPARK code. For instance, if a C function is called with a 32-bits integer argument, the SPARK interface of this function should also be called with a 32-bits integer argument. It is the responsibility of the user to ensure this.
 
-Although formal verification can only be applied to the SPARK translated code, pre- and post-conditions can be attached to C functions bindings in SPARK to allow the formal verification tools to reason about side effects of calling these functions that can affect the SPARK code. Since the functional specification of these contracts can not be proved, it is the programmer's role to ensure their correctness. Interfacing C and SPARK code can be error-prone if it is not done carefully. \Cref{sec:verif} discusses how we mitigate this issue effectively for our SPARK/C interfacing.
+Although formal verification can only be applied to the SPARK translated code,  preconditions and postconditions can be attached to C functions interfaced in SPARK to allow reasoning about the side effects of calling these functions by the SPARK code. Since the functional specification of these contracts cannot be proved, it is the programmer's role to ensure their correctness. Interfacing C and SPARK code can be error-prone if it is not done carefully. \Cref{sec:verif} discusses how to mitigate this issue effectively.
 
 \todo[inline]{KG: fixed up to here}
 
 \subsection{Dealing with pointers}
 \label{sec:pointers}
 
-In CycloneTCP library, pointers are often manipulated at top-level and transmitted
-to C functions. They are also used as fields in structures, for instance in
-the socket structure to store other complex data-structures and recursive pointer
-based data-structures. SPARK use a pointer ownership model to prevent bugs
-involving pointers such as memory leak or double free. When a memory area is
-allocated, a pointer points to this memory area and thus it is owned.
+In the CycloneTCP library, pointers are used both as the type of variables, to pass objects when calling other functions, and the type of structure fields, for instance in
+the socket structure to store other complex data-structures and recursive pointer-based data-structures. SPARK use a pointer ownership model to prevent bugs
+involving pointers such as memory leak or double free, which imposes some restrictions on how pointers are manipulated.
+When a memory area is allocated, a pointer points to this memory area and thus it is owned.
 The ownership of the memory can be moved but the memory must be deallocated
 before the end of the execution of the program.
 
 \subsection{Specifying the frame condition}
 
-The socket structure is shared between different functions, and contains a lot
-of fields. Most of the fields are used in other parts of library and are not
-relevant for our verification. We only need to concentrate on a subset of fields
-to make the specifications easier to write, and to understand.
-This can be achieved in SPARK by using \emph{models} and \emph{ghost code}
-which are used by GNATprove for analysis but not compiled in the final executable.
+The socket structure is shared between different functions, and contains lots
+of fields. Most of the fields are used in other parts of the library and are not
+relevant for our verification. Thus we use \emph{ghost code} in SPARK
+to focus the verification effort on the relevant subset of the fields,
+which also makes the specifications easier to write and to understand.
+This is a solution to the classical problem of specifying the \emph{frame condition} for a function, that is, the set of possibly modified objects.
+Ghost code is used by GNATprove for analysis but not compiled in the final executable.
 
-In the contract, we use the construction \spark{Model(Sock)} to refer the
-relevant fields of the object \spark{Sock} where
-\spark{Model} is a ghost function that extract the fields of interest from
-\spark{Sock}, like in the construction frequently used in postconditions
+More specifically, we define a \emph{model} of the actual socket as a ghost function for use in contracts: \spark{Model(Sock)}
+extracts the fields of interest from socket \spark{Sock}.
+A frequent usage in postconditions is
 \begin{lstlisting}[language=Ada, basicstyle=\small\ttfamily]
 Model(Sock) = (Model(Sock)'Old with delta
                     State => TCP_STATE_CLOSED)
 \end{lstlisting}
-that states that relevant fields of \spark{Sock} selected by \spark{Model} are
-not changed by the function call, except the fields \spark{State} that is equal
+that states that relevant fields of \spark{Sock} selected by \spark{Model} are
+not changed by the function call, except for the field \spark{State} that is equal
 to \spark{TCP_STATE_CLOSED} after the call.
 
 \section{Conformance to the TCP protocol}
@@ -210,33 +211,30 @@ to \spark{TCP_STATE_CLOSED} after the call.
 % The reader can refer to the code at \url{https://github.com/AdaCore/Http_Cyclone}.
 
 
-\subsection{Extracting a specification from the TCP norm}
+\subsection{Extracting a specification from RFC 793}
 
 Extracting a specification
-is mandatory to provide functional contracts to the user functions. That can
-be achieved by reading the norm. However, the norm is underspecified in many
-cases and only one possible implementation is depicted. Thus, the specifications
-we have extracted are conformant with the norm but they slightly differ to what
-can be found in the RFC.
-Among the specification we have extracted:
+is mandatory for provide functional contracts to the user functions. That can
+be achieved by reading the text of RFC 793. However, the text is underspecified in many
+cases and only one possible implementation is described. We made the following choices in our formalization of the TCP specification:
 \begin{itemize}
-\item The transitions between the states must respect the order given by the
+\item The transitions between states must respect the order given by the
 state machine described in figure~\ref{Fig:statemachine}.
 In particular, a transition from a state to
 another is valid only if there exists a transition in the state machine between
 these two states.
-\item The user functions contain functional specifications in the norm, that
-have to be done  when a function is called depending on the state of the
-socket~\cite[p. 52]{rfc793}. In particular it is specified in what state the
-function can be called without returning an error.
+\item RFC 793 describes conditions on the state of the socket for calling user functions,
+which need to hold when the function is called~\cite[p. 52]{rfc793}. In particular it is specified in what state the
+function can be called without returning an error. These became preconditions in our formalization.
 \end{itemize}
 
 \subsection{Rewriting the TCP user functions}
 
-The user functions of the TCP protocol have been rewritten in SPARK. Besides
-proving the absence of run-time error in these functions, it has been possible
-to check that the functional specifications of the TCP protocol are not violated
-by the code.
+The user functions defining the API of the TCP protocol were fully rewritten in SPARK.
+SPARK bindings were also provided to the majority of the rest of the library’s C functions to allow their invocation from the SPARK code,
+taking into account their effect on the TCP state machine in their contracts.
+GNATprove was used to prove that the implementation of user functions is free of run-time errors and
+respects the functional specifications of the TCP protocol that we formalized in contracts.
 
 % dire que les fonctions appelées dans le code on était modélisées pour prendre
 % en compte les changements d'état TCP qu'elles occasionnent.
@@ -245,40 +243,47 @@ by the code.
 % ça doit donc être pris en compte. Et certains état se font directement lors de
 % l'appel d'une fonction particulière et ça doit aussi être pris en compte.
 
-When a transition has to be made in the code, it is made through the helper
-function \spark{TCP_Change_State}. The precondition of this function describes
-all the allowed transitions. Therefore, when we try to do a forbidden transition,
-GNATprove will display a message. This is the most direct way to make a
-transition in the state machine.
-As the TCP user functions are all protected with a mutex to avoid interferences
-from other threads that could change the TCP state during their execution, in
-particular when a new segment is received, it is quite easy to know the
-possible set of state that can have the socket during the all execution of the
-functions.
+To model transitions of the TCP state machine inside the code, we defined the helper
+function \spark{TCP_Change_State}, whose contract describes
+all the transitions allowed.
+As calls to user functions are protected with a mutex to avoid interferences
+from other threads, the only changes to the TCP state machine inside user functions are
+related to their actions. We model these changes by calling \spark{TCP_Change_State}
+at places that correspond to a transition of the TCP machine.
 
-There is only one function that makes the verification harder because it
-releases the mutex: the function \spark{TCP_Wait_For_Events}.
-It takes as argument an event to wait and returns once the event
-is triggered by the reception of a segment.
-The role of this
-function is to release the mutex and allow the reception task to process the
-incoming segments. This function
-can be used, for example, in the function \spark{open} when the connection
-is initialized to wait until the connection has been established or not to
+% Yannick: I don't understand the following, needs to be rephrased if we want to keep it
+%
+% particular when a new segment is received, it is quite easy to know the
+% possible set of state that can have the socket during the all execution of the
+% functions.
+
+The function \spark{TCP_Wait_For_Events} requires special handling because it may
+release the mutex. This function takes in argument an event on which it should wait,
+and returns once the event is triggered by the reception of a segment.
+While waiting, it releases the mutex to allow the reception task to process incoming segments.
+For example, this function is called from \spark{open} after the connection
+has been initialized, to wait until the connection has been established or not, in order to
 correctly set the error that indicates to the user the state of the connection.
-If we consider that everything can happen during a call to \spark{TCP_Wait_For_Events},
-the verification becomes too imprecise and it becomes impossible to prove the
-functional specifications extracted from the norm. Instead we have decided to
-find a better contract to this function.
+
+% Yannick: we talk about error above, but there is no error if the connection is established???
+% This needs rephrasing
+
+A correct but imprecise contract for \spark{TCP_Wait_For_Events} would allow any change in the TCP
+state machine while waiting. But it would make it impossible to prove that its callers
+satisfy their functional specification. We need a more precise contract for this function.
 
 \subsection{Dealing with synchronous changes of states}
 
+% Yannick: below "a new segement...if it contains a new segment" is not phrased correctly
+
 The function \spark{TCP_Wait_For_Events} first checks if the event is not already
 true. If not, the mutex is released until a segment that triggered the event is
-received or until the timeout is reach. Each time a new segment is received, it
+received or until the timeout is reached. Each time a new segment is received, it
 is processed and if it contains a segment that causes a change of state, the TCP
 state is updated. Then the events are updated, and if the waited event becomes
 true due to the change of state, it is triggered.
+
+% Yannick: the above final sentence is unclear: what is triggered?
 
 \begin{algorithm}[t]
     \caption{Function to compute the possible state after the completion of a
@@ -567,7 +572,7 @@ safer result.
 
 Our verification of the TCP protocol only focuses on the validity of the
 transitions in the TCP state machine, but some other properties are formulated
-in the TCP norm, and could be verified in the implementation to make it even
+in RFC 793, and could be verified in the implementation to make it even
 more robust.
 
 \bibliographystyle{IEEEtran}
