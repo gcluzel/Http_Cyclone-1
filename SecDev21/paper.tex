@@ -109,7 +109,7 @@ Networking communication models define the processes of transferring information
 
 Existing research has dealt with formally verifying several protocols of TCP/IP stack levels. Early work formalized the TCP protocol to prove some key properties of the protocol itself~\cite{smith1996formal}. More recently, researchers have formally specified TCP, UDP and the Sockets API in HOL~\cite{tcp2005sigcomm,ridge2008rigorous} and used the resulting specification for testing existing libraries. Others have formally specified and implemented the SSL/TLS protocol in F*\cite{bhargavan2013implementing}, and integrated the resulting implementation in existing libraries. To the best of our knowledge, no prior work attempted to formally verify an implementation of TCP, although the authors of~\cite{ridge2008rigorous} suggest that it would possible to extract an actual implementation in Haskell from their specification.
 
-In this paper, we take a practical approach, where the security of an existing TCP/IP stack implementation written in ANSI C programming language is incrementally enhanced by replacing parts of its code with formally verified code in SPARK~\cite{mccormick_chapin_2015}, a subset of the Ada programming language supported by formal verification tools. We chose CycloneTCP, a professional-grade open source embedded TCP/IP library developed by the Oryx Embedded company~\cite{CycloneTCP}. \Cref{Fig:TcpStack} shows the protocols supported by the library. This work focuses on the TCP and Socket components of the stack. The library's TCP implementation is meant to conform with the RFC 793 protocol specifications~\cite{rfc793}. The quality of the CycloneTCP is acknowledged by the AMNESIA:33 report \cite{AMNESIA33}, which classifies it as one of the most resilient TCP/IP stack.
+In this paper, we take a practical approach, where the security of an existing TCP/IP stack implementation written in ANSI C programming language is incrementally enhanced by replacing parts of its code with formally verified code in SPARK~\cite{mccormick_chapin_2015}, a subset of the Ada programming language supported by formal verification tools. We chose CycloneTCP, a professional-grade open source embedded TCP/IP library developed by the Oryx Embedded company~\cite{CycloneTCP}. \Cref{Fig:TcpStack} shows the protocols supported by the library. This work focuses on the TCP and Socket components of the stack. The library's TCP implementation is meant to conform with the RFC 793 protocol specifications~\cite{rfc793}. The quality of the CycloneTCP is acknowledged by the AMNESIA:33 report~\cite{AMNESIA33}, which classifies it as one of the most resilient TCP/IP stack.
 
 \todo[inline]{KG:pending contributions list and fixing the next paragraph. Will be fixed when the rest of the paper is finalized.}
 
@@ -209,11 +209,11 @@ state machine described in figure~\ref{Fig:statemachine}. In particular, a trans
 
 \subsection{Rewriting the TCP user functions}
 
-The user functions defining the API of the TCP protocol were fully rewritten in SPARK.
-SPARK bindings were also provided to the majority of the rest of the library’s C functions to allow their invocation from the SPARK code,
-taking into account their effect on the TCP state machine in their contracts.
-GNATprove was used to prove that the implementation of user functions is free of run-time errors and
-respects the functional specifications of the TCP protocol that we formalized in contracts.
+The original \emph{CycloneTCP} library provides no guarantees that the implementation respects the TCP functional specification. Thus, there is no assurance that the implementation will only allow valid transitions between the different states that a TCP session can exhibit. We aim to use the SPARK technology to verify that the implementation respects the TCP automaton, given in \cref{Fig:statemachine}. Although, this work is focused on hardening the API of the user task, mainly the high-level user functions, to verify the state transitions the rest of the TCP protocol has to be taken into account. The reason for this is two-fold. First, although user-functions can trigger state transitions, the actual transitions are done by library functions that do not belong to the user-task set of functions. Second, other parts of the library can trigger state transitions during and between the user-task function calls, which can affect the intermediate and final states that a user related function can exhibit.
+
+The TCP user API related functions were fully translated to SPARK. SPARK bindings were also provided to the majority of the rest of the library's C functions to allow their invocation from the SPARK code.
+
+RFC 793 document provides all the information needed for the allowed transitions between the different TCP possible states. For any transitions that are directly triggered through the call of the user-tasks functions, SPARK contracts, that represent transitions allowed by the functional specification, are embedded within the SPARK translated code. The \texttt{TCP\_Change\_State} is a helper function that is called every time a state transition needs to be made, to update the socket's state. An incorrect transition allowed by the code will be detected by the prover.
 
 % dire que les fonctions appelées dans le code on était modélisées pour prendre
 % en compte les changements d'état TCP qu'elles occasionnent.
@@ -222,36 +222,19 @@ respects the functional specifications of the TCP protocol that we formalized in
 % ça doit donc être pris en compte. Et certains état se font directement lors de
 % l'appel d'une fonction particulière et ça doit aussi être pris en compte.
 
-To model transitions of the TCP state machine inside the code, we defined the helper
-function \spark{TCP_Change_State}, whose contract describes
-all the transitions allowed.
-As calls to user functions are protected with a mutex to avoid interferences
-from other threads, the only changes to the TCP state machine inside user functions are
-related to their actions. We model these changes by calling \spark{TCP_Change_State}
-at places that correspond to a transition of the TCP machine.
-
 % Yannick: I don't understand the following, needs to be rephrased if we want to keep it
 %
 % particular when a new segment is received, it is quite easy to know the
 % possible set of state that can have the socket during the all execution of the
 % functions.
 
-The function \spark{TCP_Wait_For_Events} requires special handling because it may
-release the mutex. This function takes in argument an event on which it should wait,
-and returns once the event is triggered by the reception of a segment.
-While waiting, it releases the mutex to allow the reception task to process incoming segments.
-For example, this function is called from \spark{open} after the connection
-has been initialized, to wait until the connection has been established or not, in order to
-correctly set the error that indicates to the user the state of the connection.
+The concurrent implementation of the TCP protocol allows for multiple interactions between the tasks, synchronous (with a call to \spark{TCP_Wait_For_Events}) or asynchronous (between two user function calls), and thus, numerous possible state changes at any given moment. This makes the functional-specification verification significantly challenging, as SPARK does not have a native mode to deal precisely with interactions related to concurrency. To address this, we introduced SPARK functions with contracts that model how the different possible interactions can modify the state of a socket. Finding a correct and precise contract for \spark{TCP_Wait_For_Events} is challenging but needed for the verification of the TCP user functions. The solution will be elaborated in \cref{subsubsec:dealing_concurrency}.
 
-% Yannick: we talk about error above, but there is no error if the connection is established???
-% This needs rephrasing
+\todo[inline]{GC: modified up to here}
 
-A correct but imprecise contract for \spark{TCP_Wait_For_Events} would allow any change in the TCP
-state machine while waiting. But it would make it impossible to prove that its callers
-satisfy their functional specification. We need a more precise contract for this function.
 
 \subsection{Dealing with synchronous changes of states}
+\label{subsubsec:dealing_concurrency}
 
 % Yannick: below "a new segement...if it contains a new segment" is not phrased correctly
 
@@ -534,6 +517,8 @@ has been applied to the SPARK and C implementations of CycloneTCP.
 For achieving this verification, 50 subprograms have been translated from C to
 SPARK. This accounts for \np{2266} lines of code of which \np{1165} are logical
 code to write and prove the specifications.
+
+The specifications are fully proved with GNATprove in 9m54s on a 12 processors with 16GB RAM laptop.
 
 % above: need time to prove automatically with GNATprove with the spec of your laptop (num of cores, amount of memory)
 
