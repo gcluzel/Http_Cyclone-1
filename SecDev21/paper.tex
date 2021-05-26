@@ -189,8 +189,6 @@ Model(Sock) = (Model(Sock)'Old with delta
 
 This states that the relevant fields of \spark{Sock} selected by \spark{Model} are not changed by the function call, except for the field \spark{State} that is equal to \spark{TCP_STATE_CLOSED} after the call.
 
-\todo[inline]{KG: fixed up to here}
-
 \section{Conformance to the TCP protocol}
 \label{sec:verif}
 
@@ -199,20 +197,15 @@ This states that the relevant fields of \spark{Sock} selected by \spark{Model} a
 
 \subsection{Extracting a specification from RFC 793}
 
-Extracting a specification
-is mandatory for provide functional contracts to the user functions. That can
-be achieved by reading the text of RFC 793. However, the text is underspecified in many
-cases and only one possible implementation is described. We made the following choices in our formalization of the TCP specification:
+Extracting a specification is mandatory for providing functional contracts to the user's functions. This can be achieved by interpreting the text of RFC 793. However, the text is underspecified, and thus, only one of the possible implementations is used by this work. The following choices were made in our formalization of the TCP specification:
+
 \begin{itemize}
 \item The transitions between states must respect the order given by the
-state machine described in figure~\ref{Fig:statemachine}.
-In particular, a transition from a state to
-another is valid only if there exists a transition in the state machine between
-these two states.
-\item RFC 793 describes conditions on the state of the socket for calling user functions,
-which need to hold when the function is called~\cite[p. 52]{rfc793}. In particular it is specified in what state the
-function can be called without returning an error. These became preconditions in our formalization.
+state machine described in figure~\ref{Fig:statemachine}. In particular, a transition from a state to another is valid only if the state machine allows for a transition between these two states.
+\item RFC 793 describes the conditions for the state of the socket which need to hold when a user's function is called~\cite[p. 52]{rfc793}. In particular, these conditions specify in what state the function can be called without returning an error. These conditions were turned into preconditions in our formalization.
 \end{itemize}
+
+\todo[inline]{KG: fixed up to here}
 
 \subsection{Rewriting the TCP user functions}
 
