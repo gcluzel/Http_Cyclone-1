@@ -172,38 +172,24 @@ Ada and SPARK offer an easy-to-use mechanism for interfacing with C code \cite{}
 
 Although formal verification can only be applied to the SPARK translated code,  preconditions and postconditions can be attached to C functions interfaced in SPARK to allow reasoning about the side effects of calling these functions by the SPARK code. Since the functional specification of these contracts cannot be proved, it is the programmer's role to ensure their correctness. Interfacing C and SPARK code can be error-prone if it is not done carefully. \Cref{sec:verif} discusses how to mitigate this issue effectively.
 
-\todo[inline]{KG: fixed up to here}
 
 \subsection{Dealing with pointers}
 \label{sec:pointers}
 
-In the CycloneTCP library, pointers are used both as the type of variables, to pass objects when calling other functions, and the type of structure fields, for instance in
-the socket structure to store other complex data-structures and recursive pointer-based data-structures. SPARK use a pointer ownership model to prevent bugs
-involving pointers such as memory leak or double free, which imposes some restrictions on how pointers are manipulated.
-When a memory area is allocated, a pointer points to this memory area and thus it is owned.
-The ownership of the memory can be moved but the memory must be deallocated
-before the end of the execution of the program.
+In the CycloneTCP library, pointers are used both as the type of variables to pass objects when calling other functions and as the type of structure fields; for instance, in the socket structure to store other complex data structures and recursive pointer-based data structures. SPARK uses a pointer ownership model to prevent bugs involving pointers such as memory leak or double free, which imposes some restrictions on how pointers are being manipulated. When a memory area is allocated, a pointer points to this memory area, and thus, it is considered "owned.'' The ownership of the memory can be moved, but the memory must be deallocated before the end of the execution of the program.
 
 \subsection{Specifying the frame condition}
 
-The socket structure is shared between different functions, and contains lots
-of fields. Most of the fields are used in other parts of the library and are not
-relevant for our verification. Thus we use \emph{ghost code} in SPARK
-to focus the verification effort on the relevant subset of the fields,
-which also makes the specifications easier to write and to understand.
-This is a solution to the classical problem of specifying the \emph{frame condition} for a function, that is, the set of possibly modified objects.
-Ghost code is used by GNATprove for analysis but not compiled in the final executable.
+The socket structure is shared between different functions and contains a large number of fields. Most of the fields are used in library parts that are not considered by this work, and thus, are not relevant for our verification. Thus we use \emph{ghost code} in SPARK to focus the verification effort on the relevant subset of the fields, which also makes the specifications easier to write and understand. This is a solution to the classical problem of specifying the \emph{frame condition} for a function, that is, the set of possibly modified objects. \emph{Ghost code} is used by GNATprove for analysis but is not being compiled in the final executable. More specifically, we define a \emph{model} of the actual socket as a ghost function that can be used in contracts: \spark{Model(Sock)} extracts the fields of interest from socket \spark{Sock}. A frequent usage in postconditions is
 
-More specifically, we define a \emph{model} of the actual socket as a ghost function for use in contracts: \spark{Model(Sock)}
-extracts the fields of interest from socket \spark{Sock}.
-A frequent usage in postconditions is
 \begin{lstlisting}[language=Ada, basicstyle=\small\ttfamily]
 Model(Sock) = (Model(Sock)'Old with delta
                     State => TCP_STATE_CLOSED)
 \end{lstlisting}
-that states that relevant fields of \spark{Sock} selected by \spark{Model} are
-not changed by the function call, except for the field \spark{State} that is equal
-to \spark{TCP_STATE_CLOSED} after the call.
+
+This states that the relevant fields of \spark{Sock} selected by \spark{Model} are not changed by the function call, except for the field \spark{State} that is equal to \spark{TCP_STATE_CLOSED} after the call.
+
+\todo[inline]{KG: fixed up to here}
 
 \section{Conformance to the TCP protocol}
 \label{sec:verif}
