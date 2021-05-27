@@ -228,22 +228,15 @@ RFC 793 document provides all the information needed for the allowed transitions
 % possible set of state that can have the socket during the all execution of the
 % functions.
 
-The concurrent implementation of the TCP protocol allows for multiple interactions between the tasks, synchronous (with a call to \spark{TCP_Wait_For_Events}) or asynchronous (between two user function calls), and thus, numerous possible state changes at any given moment. This makes the functional-specification verification significantly challenging, as SPARK does not have a native mode to deal precisely with interactions related to concurrency. To address this, we introduced SPARK functions with contracts that model how the different possible interactions can modify the state of a socket. Finding a correct and precise contract for \spark{TCP_Wait_For_Events} is challenging but needed for the verification of the TCP user functions. The solution will be elaborated in \cref{subsubsec:dealing_concurrency}.
-
-\todo[inline]{GC: modified up to here}
+The concurrent implementation of the TCP protocol allows for multiple interactions between the tasks, synchronous (with a call to \spark{TCP_Wait_For_Events}) or asynchronous (between two user function calls), and thus, numerous possible state changes at any given moment. This makes the functional-specification verification significantly challenging, as SPARK does not have a native mode to deal precisely with interactions related to concurrency. To address this, we introduced SPARK functions with contracts that model how the different possible interactions can modify the state of a socket. Finding a correct and precise contract for \spark{TCP_Wait_For_Events} is challenging but needed for the verification of the TCP user functions. The solution will be elaborated in the next section.
 
 
-\subsection{Dealing with synchronous changes of states}
-\label{subsubsec:dealing_concurrency}
+\subsection{Dealing with synchronous exchanges}
 
 % Yannick: below "a new segement...if it contains a new segment" is not phrased correctly
 
-The function \spark{TCP_Wait_For_Events} first checks if the event is not already
-true. If not, the mutex is released until a segment that triggered the event is
-received or until the timeout is reached. Each time a new segment is received, it
-is processed and if it contains a segment that causes a change of state, the TCP
-state is updated. Then the events are updated, and if the waited event becomes
-true due to the change of state, it is triggered.
+Sometimes the resulting state of a user function can be affected by the rest of the TCP tasks is when the user's functions release the mutex to allow for other events to take place. In this case, the function \spark{TCP_Wait_For_Events} is called from the user function to check if the event requested is completed. For example, the \spark{TCP_Connect} user function calls \spark{TCP_Wait_For_Events} to wait for the completion of the socket connection event, namely the \spark{SOCKET\_EVENT\_CONNECTED}. The call to the \spark{TCP_Wait_For_Events} releases the mutex, and when the \emph{arriving} task receives the appropriate segments, in this case, a segment with the \syn flag, the connection will be established. This will move the socket to the \sestab state. In the meantime, the \spark{TCP\_Update\_Events} function is monitoring for any state changes and when it notices that the connection is established it will trigger the \spark{SOCKET\_EVENT\_CONNECTED} event, using the OS event mechanism. This will allow the \spark{TCP\_Connect} user function to resume execution.
+
 
 % Yannick: the above final sentence is unclear: what is triggered?
 
@@ -251,7 +244,7 @@ true due to the change of state, it is triggered.
 
 \begin{algorithm}[t]
     \caption{Function to compute the possible state after the completion of a
-particular event that is requested by a user-task related function.}
+particular event that is requested by a user function.}
 \label{algo:waitForEvents}
 \begin{algorithmic}[1]
 \footnotesize
@@ -281,25 +274,16 @@ particular event that is requested by a user-task related function.}
 %   as \spark{TCP_Wait_For_Events}. This procedure is proved automatically
 %   without even a loop invariant thanks to loop unrolling in GNATprove.
 
-An event is considered to be true or not depending on the state of the socket.
-This computation is done by the function \spark{TCP_Update_Events}. We have put
-a contract on it, which is proved to be correct by SPARK. Then we can write a
-function that emulates what is done when \spark{TCP_Wait_For_Events} is called.
-We have written a procedure \spark{TCP_Wait_For_Events_Proof}, reproduced in
-algorithm~\ref{algo:waitForEvents} to compute all the possible TCP states that a
-socket can have after a wait. This algorithm simulates the reception of
-one message, update the events and return if the event waited is reached.
-Otherwise it repeats the procedures. The for loop only requires three steps
-because all the step in the state machine can be reached in three segment
-receptions without user interaction.
+Essentially, the function \spark{TCP_Wait_For_Events} releases the mutex to allow for required events to happen. The function \spark{TCP_Update_Events} detects that the event expected outcome is completed by monitoring the changes to the TCP states. Then it updates the specified event to be true in the socket structure, and it raises the desired event to allow the resuming of the user function that requested the event in the first place. Thus, the \spark{TCP_Update_Events} function is called when a segment is being received, and a state change took place. This makes the \spark{TCP_Update_Events} function a perfect candidate to introduce contracts in SPARK and model the possible states after the completion of each event.
 
-On \spark{TCP_Wait_For_Events_Proof}, a contract has been put to describe all
-the possible states that a socket can have after the wait. It is only possible
-to prove this contract with SPARK if the function named
-\spark{TCP_Process_One_Segment} in algorithm~\ref{algo:waitForEvents}
-has a postcondition.
+To model any possible state-changes upon the reception of a segment in SPARK, the function \spark{TCP_Process_One_Segment} is introduced.
+The behavior of \spark{TCP_Wait_For_Events} is modeled by the ghost function \spark{TCP_Wait_For_Events_Proof} shown in \cref{algo:waitForEvents}. It computes the set of possible final states after the completion of an event by reusing the function \spark{TCP_Process_One_Segment}. Both functions have the same behavior, and thus, the contract of the function \spark{TCP_Wait_For_Events_Proof} is also attached to \spark{TCP_Wait_For_Events}. This ghost function is proved automatically without even a loop invariant thanks to loop unrolling in GNATprove.
+
+\todo[inline]{GC: modified up to here}
 
 \subsection{Symbolic execution to extract contracts}
+
+\todo[inline]{Is this part good enough or does it need to be rewritten?}
 
 Rewriting the part that processes the incoming segments was out of the scope of
 this work. Instead, we have opted for the use of symbolic execution on the
