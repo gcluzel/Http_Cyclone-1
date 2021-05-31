@@ -283,10 +283,8 @@ The behavior of \spark{TCP_Wait_For_Events} is modeled by the ghost function \sp
 
 \subsection{Symbolic execution to extract contracts}
 
-\todo[inline]{Is this part good enough or does it need to be rewritten?}
-
-The soundness of our verificatin requires all the contracts to be correct, in particular this is true for the contract of \spark{TCP_Process_One_Segment}.
-Get this contract can be done by rewriting in SPARK the part that processes the
+The soundness of our verification requires all the contracts to be correct, in particular this is true for the contract of \spark{TCP_Process_One_Segment} that is used to prove the function \spark{TCP_Wait_For_Events}.
+Getting this contract can be done by rewriting in SPARK the part that processes the
 incoming segments, but this is out of the scope of this work.
 Instead, we have opted for the use of symbolic execution on the
 original CycloneTCP C code.
@@ -362,7 +360,7 @@ processing.
 The TCP protocol implies a specific order such that the user can call the API's
 functions without breaking the functional specification of the protocol. This
 order also is being conveyed by the protocol's state machine given in
-figure~\ref{Fig:statemachine}.
+\Cref{Fig:statemachine}.
 Ada's preconditions and postconditions are a powerful tool to express such inter-function
 dependencies, while SPARK technology can be used to guarantee that the
 assertions always hold. Thus, preconditions and postconditions were introduced to model
@@ -399,7 +397,7 @@ postconditions}
 \end{figure}
 
 Simplified contracts extracted from our library are reproduced in
-figure~\ref{fig:functionorder}. If no error occurs, the function
+\Cref{fig:functionorder}. If no error occurs, the function
 \spark{Socket_Connect} sets \spark{Sock.S_Remote_Ip_Addr} to
 \spark{Remote_Ip_Addr} which is supposed to be
 initialized when the function is called. \spark{Socket_Send} requires to be
