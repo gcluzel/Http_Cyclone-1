@@ -226,16 +226,15 @@ RFC 793 document provides all the information needed for the allowed transitions
 % possible set of state that can have the socket during the all execution of the
 % functions.
 
-\todo[inline]{KG: fixed up to here}
 
-The concurrent implementation of the TCP protocol allows for multiple interactions between the tasks, synchronous (with a call to \spark{TCP_Wait_For_Events}) or asynchronous (between two user function calls), and thus, numerous possible state changes at any given moment. This makes the functional-specification verification significantly challenging, as SPARK does not have a native mode to deal precisely with interactions related to concurrency. To address this, we introduced SPARK functions with contracts that model how the different possible interactions can modify the state of a socket. Finding a correct and precise contract for \spark{TCP_Wait_For_Events} is challenging but needed for the verification of the TCP user functions. The solution will be elaborated in the next section.
+The concurrent implementation of the TCP protocol allows for multiple interactions between the tasks, synchronous (with a call to \spark{TCP_Wait_For_Events}) or asynchronous (between two user function calls), and thus, numerous possible state changes at any given moment. This makes the functional specification verification significantly challenging, as SPARK does not have a native mode to deal precisely with interactions related to concurrency. To address this, we introduced SPARK functions with contracts that model how the different possible interactions can modify the state of a socket. Finding a correct and precise contract for \spark{TCP_Wait_For_Events} is challenging but needed for the verification of the TCP user functions. The solution is elaborated in the following section.
 
 
 \subsection{Dealing with synchronous exchanges}
 
 % Yannick: below "a new segement...if it contains a new segment" is not phrased correctly
 
-Sometimes the resulting state of a user function can be affected by the rest of the TCP tasks is when the user's functions release the mutex to allow for other events to take place. In this case, the function \spark{TCP_Wait_For_Events} is called from the user function to check if the event requested is completed. For example, the \spark{TCP_Connect} user function calls \spark{TCP_Wait_For_Events} to wait for the completion of the socket connection event, namely the \spark{SOCKET\_EVENT\_CONNECTED}. The call to the \spark{TCP_Wait_For_Events} releases the mutex, and when the \emph{arriving} task receives the appropriate segments, in this case, a segment with the \syn flag, the connection will be established. This will move the socket to the \sestab state. In the meantime, the \spark{TCP\_Update\_Events} function is monitoring for any state changes and when it notices that the connection is established it will trigger the \spark{SOCKET\_EVENT\_CONNECTED} event, using the OS event mechanism. This will allow the \spark{TCP\_Connect} user function to resume execution.
+In the synchronous scenario of interaction between the TCP tasks, the resulting state of a user function can be affected by the rest of the TCP tasks when the user's functions release the mutex to allow for other events to occur. In this case, the function \spark{TCP_Wait_For_Events} is called from the user function to check if the event requested is completed. For example, the \spark{TCP_Connect} user function calls \spark{TCP_Wait_For_Events} to wait for the completion of the socket connection event, namely the \spark{SOCKET\_EVENT\_CONNECTED}. The call to the \spark{TCP_Wait_For_Events} releases the mutex, and when the \emph{arriving} task receives the appropriate segments, in this case, a segment with the \syn flag, the connection will be established. This will move the socket to the \sestab state. In the meantime, the \spark{TCP\_Update\_Events} function is monitoring for any state changes, and when it notices that the connection is established, it will trigger the \spark{SOCKET\_EVENT\_CONNECTED} event, using the OS event mechanism. This will allow the \spark{TCP\_Connect} user function to resume execution.
 
 
 % Yannick: the above final sentence is unclear: what is triggered?
@@ -273,6 +272,8 @@ particular event that is requested by a user function.}
 %   the possible chain of events that occur while waiting, with the same contract
 %   as \spark{TCP_Wait_For_Events}. This procedure is proved automatically
 %   without even a loop invariant thanks to loop unrolling in GNATprove.
+
+\todo[inline]{KG: fixed up to here}
 
 Essentially, the function \spark{TCP_Wait_For_Events} releases the mutex to allow for required events to happen. The function \spark{TCP_Update_Events} detects that the event expected outcome is completed by monitoring the changes to the TCP states. Then it updates the specified event to be true in the socket structure, and it raises the desired event to allow the resuming of the user function that requested the event in the first place. Thus, the \spark{TCP_Update_Events} function is called when a segment is being received, and a state change took place. This makes the \spark{TCP_Update_Events} function a perfect candidate to introduce contracts in SPARK and model the possible states after the completion of each event.
 
