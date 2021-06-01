@@ -234,7 +234,7 @@ The concurrent implementation of the TCP protocol allows for multiple interactio
 
 % Yannick: below "a new segement...if it contains a new segment" is not phrased correctly
 
-In the synchronous scenario of interaction between the TCP tasks, the resulting state of a user function can be affected by the rest of the TCP tasks when the user's functions release the mutex to allow for other events to occur. In this case, the function \spark{TCP_Wait_For_Events} is called from the user function to check if the event requested is completed. For example, the \spark{TCP_Connect} user function calls \spark{TCP_Wait_For_Events} to wait for the completion of the socket connection event, namely the \spark{SOCKET\_EVENT\_CONNECTED}. The call to the \spark{TCP_Wait_For_Events} releases the mutex, and when the \emph{arriving} task receives the appropriate segments, in this case, a segment with the \syn flag, the connection will be established. This will move the socket to the \sestab state. In the meantime, the \spark{TCP\_Update\_Events} function is monitoring for any state changes, and when it notices that the connection is established, it will trigger the \spark{SOCKET\_EVENT\_CONNECTED} event, using the OS event mechanism. This will allow the \spark{TCP\_Connect} user function to resume execution.
+In the synchronous scenario of interaction between the TCP tasks, the resulting state of a user function can be affected by the rest of the TCP tasks when the user's functions release the mutex to allow for other events to occur. In this case, the function \spark{TCP_Wait_For_Events} (located in the file \texttt{tcp\_misc\_binding.ads}) is called from the user function to check if the event requested is completed. For example, the \spark{TCP_Connect} user function calls \spark{TCP_Wait_For_Events} to wait for the completion of the socket connection event, namely the \spark{SOCKET\_EVENT\_CONNECTED}. The call to the \spark{TCP_Wait_For_Events} releases the mutex, and when the \emph{arriving} task receives the appropriate segments, in this case, a segment with the \syn flag, the connection will be established. This will move the socket to the \sestab state. In the meantime, the \spark{TCP\_Update\_Events} function is monitoring for any state changes, and when it notices that the connection is established, it will trigger the \spark{SOCKET\_EVENT\_CONNECTED} event, using the OS event mechanism. This will allow the \spark{TCP\_Connect} user function to resume execution.
 
 
 % Yannick: the above final sentence is unclear: what is triggered?
@@ -273,18 +273,17 @@ particular event that is requested by a user function.}
 %   as \spark{TCP_Wait_For_Events}. This procedure is proved automatically
 %   without even a loop invariant thanks to loop unrolling in GNATprove.
 
-\todo[inline]{KG to GC : when you are talking about functions you should say where they are located. There will be readers that will want to see the corresponding code in the repository. Look for examples in the HICLASS report: e.g. This is implemented by the Tcp\_Wait\_For\_Events\_Proof function, located in the tcp\_misc\_binding.adb}
+% \todo[inline]{KG to GC : when you are talking about functions you should say where they are located. There will be readers that will want to see the corresponding code in the repository. Look for examples in the HICLASS report: e.g. This is implemented by the Tcp\_Wait\_For\_Events\_Proof function, located in the tcp\_misc\_binding.adb}
 
 Essentially, the function \spark{TCP_Wait_For_Events} releases the mutex to allow for required events to happen. The function \spark{TCP_Update_Events} detects that the event's expected outcome is completed by monitoring the changes to the TCP states. Then it updates the specified event to be true in the socket structure, and it raises the desired event to allow the resuming of the user function that requested the event in the first place. Thus, the \spark{TCP_Update_Events} function is called when a segment is being received and a state change took place. This makes the \spark{TCP_Update_Events} function a perfect candidate to introduce contracts in SPARK and model the possible states after the completion of each event.
 
-To model any possible state changes upon the reception of a segment in SPARK, the function \spark{TCP_Process_One_Segment} is introduced.
-The behavior of \spark{TCP_Wait_For_Events} is modeled by the ghost function \spark{TCP_Wait_For_Events_Proof} shown in \Cref{algo:waitForEvents}. It computes the set of possible final states after the completion of an event by reusing the function \spark{TCP_Process_One_Segment}. Both functions have the same behavior, and thus, the contract of the function \spark{TCP_Wait_For_Events_Proof} is also attached to \spark{TCP_Wait_For_Events}. This ghost function is proved automatically without even a loop invariant, thanks to loop unrolling in GNATprove.
+To model any possible state changes upon the reception of a segment in SPARK, the function \spark{TCP_Process_One_Segment} located in the file \texttt{tcp\_fsm\_binding.ads} is introduced.
+The behavior of \spark{TCP_Wait_For_Events} is modeled by the ghost function \spark{TCP_Wait_For_Events_Proof} (that can be found in the file \texttt{tcp\_misc\_binding.ads}) shown in \Cref{algo:waitForEvents}. It computes the set of possible final states after the completion of an event by reusing the function \spark{TCP_Process_One_Segment}. Both functions have the same behavior, and thus, the contract of the function \spark{TCP_Wait_For_Events_Proof} is also attached to \spark{TCP_Wait_For_Events}. This ghost function is proved automatically without even a loop invariant, thanks to loop unrolling in GNATprove.
 
-\todo[inline]{GC: modified up to here}
 
 \subsection{Symbolic execution to extract contracts}
 
-The soundness of our verification requires all the contracts to be complete and correct; all the possible state transitions of a TCP connection must be modeled and proved.  In particular, this is true for the contract of \spark{TCP_Process_One_Segment} that is used to prove the function \spark{TCP_Wait_For_Events}. In our case, because not all the TCP library is translated to SPARK, any transitions triggered from the C part of the library are not accounted, since they can not be proved. To overcome this issue, symbolic execution was used on the original CycloneTCP C code to exhaustively verify any contracts related to transitions triggered from the C parts of the library. Once these contracts are verified, the relevant C code is proved to respect the TCP functional specification protocol. 
+The soundness of our verification requires all the contracts to be complete and correct; all the possible state transitions of a TCP connection must be modeled and proved.  In particular, this is true for the contract of \spark{TCP_Process_One_Segment} that is used to prove the function \spark{TCP_Wait_For_Events}. In our case, because not all the TCP library is translated to SPARK, any transitions triggered from the C part of the library are not accounted, since they can not be proved. To overcome this issue, symbolic execution was used on the original CycloneTCP C code to exhaustively verify any contracts related to transitions triggered from the C parts of the library. Once these contracts are verified, the relevant C code is proved to respect the TCP functional specification protocol.
 
 Symbolic execution is a means of executing programs with symbolic values rather than concrete values \cite{symbolic_exec_survey:2018}. Exhaustive symbolic execution can be considered sound and complete (it prevents false negatives and false positives), and thus, it is suitable for formal verification. In \cite{vanoverberghe2008using}, the authors present how symbolic execution can be used to improve deductive verification, and in \cite{kassios2012comparing} the authors demonstrated the technique's value in inferring contracts. For our work,  the KLEE\footnote{\url{https://klee.github.io}} symbolic execution engine has been used. KLEE is built upon the LLVM optimizer's bytecode, and it offers a very simple yet powerful C interface.
 
@@ -319,23 +318,9 @@ with KLEE}
 
 \todo[inline]{KG: fixed up to here}
 
-The first step in order to extract contracts was to read the state machine to
-know all the possible transitions that can be done by the reception of a flag,
-and adapt it to
-the subtleties of CycloneTCP. The next step is to write a driver to run KLEE and
-know if the contracts that we have inferred are correct or not.
-A simplified example is shown in \Cref{code:kleedriver}. The first lines
-create a symbolic incoming segment to process and a symbolic socket.
-At \cref{code:kleedriver:tcpProcessSegment} the function that processes the
-segment is executed. It is followed at \cref{code:kleedriver:assert} by a KLEE
-builtin that checks if the code leads to a valid state identified in the
-protocol’s specification for all the paths explored.
+We want to prove that the C code implementation of the respects rules extracted from RFC 793. To achieve this, symbolic execution is used to verify that all the possible paths when executing the \spark{tcpProcessSegment} function will result in a state that respects the RFC 793 rules. This process requires three steps, that are show in \Cref{code:kleedriver}. A symbolic incoming segment is created in the first lines to allow us to account for all possible incoming segments. Then at \cref{code:kleedriver:tcpProcessSegment} the function \texttt{tcpProcessSegment} is executed symbolically with KLEE. Finally, it is followed at \cref{code:kleedriver:assert} by a call to \texttt{klee\_assert} that checks if the code leads to a valid state identified in the protocol’s specification.
 
-Once the contract is validated by KLEE, it can be copied out on the SPARK
-function \spark{TCP_Process_One_Segment}. With this step done, the concurrency
-challenge has been solved and the function
-\spark{TCP_Wait_For_Events} has a correct and an accurate contract, which
-makes possible the verification of the functional correctness of the TCP user
+Once the \texttt{klee\_assert} is validated by KLEE, which means that the code respects the RFC 793 specification, it can be copied out as a valid SPARK contract for the function \spark{TCP_Process_One_Segment}. With this step done, the concurrency challenge has been solved and the function \spark{TCP_Wait_For_Events} has a correct and an accurate contract, which makes possible the verification of the functional correctness of the TCP user
 functions thanks to SPARK.
 
 \section{Hardening the user's API}
@@ -508,7 +493,7 @@ step toward a secure implementation. It has been proved by the tool GNATprove
 that our implementation is free of run-time errors and that all the transitions
 in the TCP state machine are done with respect to the norm.
 
-However weeknesses exist in our implementation, in particular because all the
+However weaknesses exist in our implementation, in particular because all the
 underlying layers are still written in C. The principal function of those layers
 is to format packet before they are sent, or parse incoming packets, check their
 integrity and transmit the resulting payload to the corresponding upper level
