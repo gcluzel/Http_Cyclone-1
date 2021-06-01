@@ -273,33 +273,20 @@ particular event that is requested by a user function.}
 %   as \spark{TCP_Wait_For_Events}. This procedure is proved automatically
 %   without even a loop invariant thanks to loop unrolling in GNATprove.
 
-\todo[inline]{KG to GC : when you are talking about functions you should say where they are located. There will be readers that will want to see the coresponding code in the repository. Look for examples in the HICLASS report: e.g. This is implemented by the Tcp\_Wait\_For\_Events\_Proof function, located in the tcp\_misc\_binding.adb}
+\todo[inline]{KG to GC : when you are talking about functions you should say where they are located. There will be readers that will want to see the corresponding code in the repository. Look for examples in the HICLASS report: e.g. This is implemented by the Tcp\_Wait\_For\_Events\_Proof function, located in the tcp\_misc\_binding.adb}
 
 Essentially, the function \spark{TCP_Wait_For_Events} releases the mutex to allow for required events to happen. The function \spark{TCP_Update_Events} detects that the event's expected outcome is completed by monitoring the changes to the TCP states. Then it updates the specified event to be true in the socket structure, and it raises the desired event to allow the resuming of the user function that requested the event in the first place. Thus, the \spark{TCP_Update_Events} function is called when a segment is being received and a state change took place. This makes the \spark{TCP_Update_Events} function a perfect candidate to introduce contracts in SPARK and model the possible states after the completion of each event.
 
 To model any possible state changes upon the reception of a segment in SPARK, the function \spark{TCP_Process_One_Segment} is introduced.
 The behavior of \spark{TCP_Wait_For_Events} is modeled by the ghost function \spark{TCP_Wait_For_Events_Proof} shown in \Cref{algo:waitForEvents}. It computes the set of possible final states after the completion of an event by reusing the function \spark{TCP_Process_One_Segment}. Both functions have the same behavior, and thus, the contract of the function \spark{TCP_Wait_For_Events_Proof} is also attached to \spark{TCP_Wait_For_Events}. This ghost function is proved automatically without even a loop invariant, thanks to loop unrolling in GNATprove.
 
-\todo[inline]{KG: fixed up to here}
-
 \todo[inline]{GC: modified up to here}
 
 \subsection{Symbolic execution to extract contracts}
 
-The soundness of our verification requires all the contracts to be correct, in particular this is true for the contract of \spark{TCP_Process_One_Segment} that is used to prove the function \spark{TCP_Wait_For_Events}.
-Getting this contract can be done by rewriting in SPARK the part that processes the
-incoming segments, but this is out of the scope of this work.
-Instead, we have opted for the use of symbolic execution on the
-original CycloneTCP C code.
-Symbolic execution is a mean to execute programs with symbolic values rather
-than concrete values. Symbolic execution has already been successfully
-used with other verification methods.
-Indeed, in~\cite{vanoverberghe2008using} the authors present how to use symbolic
-execution to improve deductive verification, and in~\cite{kassios2012comparing}
-the authors explain that symbolic execution can be good at inferring contracts.
-For our work, KLEE\footnote{\url{https://klee.github.io}} has been used.
-It is built on top of LLVM as it takes LLVM
-bytecode in input and works well with C code thanks to a very simple interface.
+The soundness of our verification requires all the contracts to be complete and correct; all the possible state transitions of a TCP connection must be modeled and proved.  In particular, this is true for the contract of \spark{TCP_Process_One_Segment} that is used to prove the function \spark{TCP_Wait_For_Events}. In our case, because not all the TCP library is translated to SPARK, any transitions triggered from the C part of the library are not accounted, since they can not be proved. To overcome this issue, symbolic execution was used on the original CycloneTCP C code to exhaustively verify any contracts related to transitions triggered from the C parts of the library. Once these contracts are verified, the relevant C code is proved to respect the TCP functional specification protocol. 
+
+Symbolic execution is a means of executing programs with symbolic values rather than concrete values \cite{symbolic_exec_survey:2018}. Exhaustive symbolic execution can be considered sound and complete (it prevents false negatives and false positives), and thus, it is suitable for formal verification. In \cite{vanoverberghe2008using}, the authors present how symbolic execution can be used to improve deductive verification, and in \cite{kassios2012comparing} the authors demonstrated the technique's value in inferring contracts. For our work,  the KLEE\footnote{\url{https://klee.github.io}} symbolic execution engine has been used. KLEE is built upon the LLVM optimizer's bytecode, and it offers a very simple yet powerful C interface.
 
 \begin{figure}
 \begin{lstlisting}[language=C, basicstyle=\footnotesize\ttfamily, numbers=left,
@@ -329,6 +316,8 @@ klee_assert( (*@\label{code:kleedriver:assert}@*)
 with KLEE}
 \label{code:kleedriver}
 \end{figure}
+
+\todo[inline]{KG: fixed up to here}
 
 The first step in order to extract contracts was to read the state machine to
 know all the possible transitions that can be done by the reception of a flag,
