@@ -205,15 +205,13 @@ state machine described in figure~\ref{Fig:statemachine}. In particular, a trans
 \item RFC 793 describes the conditions for the state of the socket which need to hold when a user's function is called~\cite[p. 52]{rfc793}. In particular, these conditions specify in what state the function can be called without returning an error. These conditions were turned into preconditions in our formalization.
 \end{itemize}
 
-\todo[inline]{KG: fixed up to here}
-
 \subsection{Rewriting the TCP user functions}
 
-The original \emph{CycloneTCP} library provides no guarantees that the implementation respects the TCP functional specification. Thus, there is no assurance that the implementation will only allow valid transitions between the different states that a TCP session can exhibit. We aim to use the SPARK technology to verify that the implementation respects the TCP automaton, given in \Cref{Fig:statemachine}. Although, this work is focused on hardening the API of the user task, mainly the high-level user functions, to verify the state transitions the rest of the TCP protocol has to be taken into account. The reason for this is two-fold. First, although user-functions can trigger state transitions, the actual transitions are done by library functions that do not belong to the user-task set of functions. Second, other parts of the library can trigger state transitions during and between the user-task function calls, which can affect the intermediate and final states that a user related function can exhibit.
+The original \emph{CycloneTCP} library provides no guarantees that the implementation respects the TCP functional specification. Thus, there is no assurance that the implementation will only allow valid transitions between the different states that a TCP session can exhibit. We aim to use the SPARK technology to verify that the implementation respects the TCP automaton, given in \Cref{Fig:statemachine}. Although this work is focused on hardening the API of the user task, mainly the high-level user functions, to verify the state transitions, the rest of the TCP protocol has to be taken into account. The reason for this is two-fold. First, although user-functions can trigger state transitions, the actual transitions are done by library functions that do not belong to the user-task set of functions. Second, other parts of the library can trigger state transitions during and between the user-task function calls, which can affect the intermediate and final states that a user-related function can exhibit.
 
-The TCP user API related functions were fully translated to SPARK. SPARK bindings were also provided to the majority of the rest of the library's C functions to allow their invocation from the SPARK code.
+The TCP user API-related functions were fully translated to SPARK. SPARK bindings were also provided to most of the rest of the library's C functions to allow their invocation from the SPARK code.
 
-RFC 793 document provides all the information needed for the allowed transitions between the different TCP possible states. For any transitions that are directly triggered through the call of the user-tasks functions, SPARK contracts, that represent transitions allowed by the functional specification, are embedded within the SPARK translated code. The \texttt{TCP\_Change\_State} is a helper function that is called every time a state transition needs to be made, to update the socket's state. An incorrect transition allowed by the code will be detected by the prover.
+RFC 793 document provides all the information needed for the allowed transitions between the different TCP possible states. For any transitions directly triggered by the call of the user-task functions, SPARK contracts, representing transitions allowed by the functional specification, are embedded within the SPARK translated code. The \texttt{TCP\_Change\_State} is a helper function that is called every time a state transition needs to be made to update the socket's state. An incorrect transition allowed by the code will be detected by the prover.
 
 % dire que les fonctions appelées dans le code on était modélisées pour prendre
 % en compte les changements d'état TCP qu'elles occasionnent.
@@ -227,6 +225,8 @@ RFC 793 document provides all the information needed for the allowed transitions
 % particular when a new segment is received, it is quite easy to know the
 % possible set of state that can have the socket during the all execution of the
 % functions.
+
+\todo[inline]{KG: fixed up to here}
 
 The concurrent implementation of the TCP protocol allows for multiple interactions between the tasks, synchronous (with a call to \spark{TCP_Wait_For_Events}) or asynchronous (between two user function calls), and thus, numerous possible state changes at any given moment. This makes the functional-specification verification significantly challenging, as SPARK does not have a native mode to deal precisely with interactions related to concurrency. To address this, we introduced SPARK functions with contracts that model how the different possible interactions can modify the state of a socket. Finding a correct and precise contract for \spark{TCP_Wait_For_Events} is challenging but needed for the verification of the TCP user functions. The solution will be elaborated in the next section.
 
