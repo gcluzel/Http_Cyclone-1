@@ -281,26 +281,26 @@ The behavior of \spark{TCP_Wait_For_Events} is modeled by the ghost function \sp
 
 \subsection{Symbolic execution to extract contracts}
 
-The soundness of our verification requires all the contracts to be complete and correct; all the possible state transitions of a TCP connection must be modeled and proved.  In particular, this is true for the contract of \spark{TCP_Process_One_Segment} that is used to prove the function \spark{TCP_Wait_For_Events}. In our case, because not all the TCP library is translated to SPARK, any transitions triggered from the C part of the library are not accounted, since they can not be proved. To overcome this issue, symbolic execution was used on the original CycloneTCP C code to exhaustively verify any contracts related to transitions triggered from the C parts of the library. Once these contracts are verified, the relevant C code is proved to respect the TCP functional specification protocol.
+The soundness of our verification requires all the contracts to be complete and correct; all the possible state transitions of a TCP connection must be modeled and proved.  In particular, this is true for the contract of \spark{TCP_Process_One_Segment} that is used to prove the function \spark{TCP_Wait_For_Events}, as it models calls to parts of the library in C that are not proved. To overcome this issue, symbolic execution was used on the original CycloneTCP C code to exhaustively verify any contracts related to transitions triggered from the C parts of the library. 
 
 Symbolic execution is a means of executing programs with symbolic values rather than concrete values \cite{symbolic_exec_survey:2018}. Exhaustive symbolic execution can be considered sound and complete (it prevents false negatives and false positives), and thus, it is complementary to formal verification. In \cite{vanoverberghe2008using}, the authors present how symbolic execution can be used to improve deductive verification, and in \cite{kassios2012comparing} the authors demonstrated the technique's value in inferring contracts. For our work, the KLEE v2.1 symbolic execution engine is used \cite{KLEE}. KLEE is built upon the LLVM optimizer's bytecode, and it offers a very simple yet powerful C interface.
 
 \begin{figure}
 \begin{lstlisting}[language=C, basicstyle=\footnotesize\ttfamily, numbers=left,
     numberstyle=\tiny, frame=bottomline, escapeinside={(*@}{@*)}]
-// creation of a fake incoming segment
+// Create a fake incoming segment
 TCPheader *segment = malloc(sizeof(TCPheader));
 klee_make_symbolic(segment, sizeof(segment), "seg");
 klee_assume(segment->flag <= 31);
-// Creation of the socket
+// Create the socket
 Socket *sock = malloc(sizeof(Socket)), oldSock;
 klee_make_symbolic(sock, sizeof(sock), "sock");
 memcpy(&oldSock, sock, sizeof(Socket));
 
-// The function that process the segments is called
+// Call the function to process the segment
 tcpProcessSegment(sock, segment); (*@\label{code:kleedriver:tcpProcessSegment}@*)
 
-// Contract to check
+// Check the expected postcondition
 klee_assert( (*@\label{code:kleedriver:assert}@*)
     (oldSock.state == TCP_STATE_ESTABLISHED) ?
         sock.state == TCP_STATE_ESTABLISHED ||
@@ -319,11 +319,11 @@ Symbolic execution is used to verify that all the possible paths when executing 
 \section{Hardening the user's API}
 \label{sec:API}
 
-One of the most significant problems pointed to by the primary author of the \emph{CycloneTCP} library is the incorrect usage of the library's API. More specifically, the library's users tend to call the API functions in the wrong order and forget to check the return code of a function call. Thus, they are subsequently allowing their  TCP implementation to behave outside of the functional specification of the protocol. The following sections demonstrate how SPARK can be used to enforce the correct usage of the library.
+One of the most significant problems pointed to by the primary author of the \emph{CycloneTCP} library is the incorrect usage of the library's API. More specifically, the users of the library sometimes call the TCP user functions in the wrong order and forget to check the return code after some calls. This causes their TCP implementation to behave outside of the functional specification of the protocol. The following sections demonstrate how SPARK can be used to enforce a correct usage of the library.
 
-\subsection{Enforcing the correct order of API functions}
+\subsection{Enforcing the correct order of TCP user functions}
 
-The TCP protocol implies a specific order such that the user can call the API's functions without breaking the functional specification of the protocol. This order also is being conveyed by the protocol's state machine given in \Cref{Fig:statemachine}. Ada's preconditions and postconditions are a powerful tool to express such inter-function dependencies, while SPARK technology can be used to guarantee that the assertions always hold. Thus, preconditions and postconditions were introduced to model a partial order on the calls to the API's functions.
+The TCP protocol implies a specific order such that the user can call the TCP user functions without breaking the functional specification of the protocol. This order is also being conveyed by the protocol's state machine given in \Cref{Fig:statemachine}. Ada's preconditions and postconditions are a powerful tool to express such inter-function dependencies, while SPARK technology can be used to guarantee that the assertions always hold. Thus, preconditions and postconditions were introduced to model a partial order on the calls to the TCP user functions.
 
 \begin{figure}
 \begin{lstlisting}[language=Ada,basicstyle=\footnotesize\ttfamily]
@@ -350,23 +350,23 @@ procedure Socket_Send
    with
    Pre => Is_Initialized_Ip (Sock.S_Remote_Ip_Addr)
 \end{lstlisting}
-\caption{An example of how function calls can be ordered by pre- and
+\caption{An example of how function calls can be ordered by preconditions and
 postconditions}
 \label{fig:functionorder}
 \end{figure}
 
-Simplified contracts extracted from our SPARK implementation are reproduced in \Cref{fig:functionorder}, to demonstrate how SPARK can be used to enforce the correct function calls' ordering. If no error occurs, the function \spark{Socket_Connect} sets \spark{Sock.S_Remote_Ip_Addr} to \spark{Remote_Ip_Addr} which is supposed to be initialized when the function is called. \spark{Socket_Send} requires to be called with a socket not null such that its field \spark{Remote_Ip_Addr} is initialized. The only way to ensure that the precondition hold is to call \spark{Socket_Connect} before \spark{Socket_Send}. The tool GNATprove can statically detect if a call to \spark{Socket_Send} is not preceded by a call to \spark{Socket_Connect}.
+Simplified contracts extracted from our SPARK implementation are reproduced in \Cref{fig:functionorder}, to demonstrate how SPARK can be used to enforce the correct function calls' ordering. If no error occurs, the function \spark{Socket_Connect} sets \spark{Sock.S_Remote_Ip_Addr} to \spark{Remote_Ip_Addr} which is supposed to be initialized when the function is called. \spark{Socket_Send} requires to be called with a not null socket such that its field \spark{Remote_Ip_Addr} is initialized. The only way to ensure that the precondition hold is to call \spark{Socket_Connect} before \spark{Socket_Send}. By analyzing user's code, GNATprove will statically detect if a call to \spark{Socket_Send} is not preceded by a call to \spark{Socket_Connect}.
 
 \subsection{Checking the correctness of return codes}
 
-The following code demonstrates how SPARK will enforce to the check of the return codes of a function and allow execution to proceed only if no error code is returned: 
+The following code demonstrates how SPARK will enforce that return codes of TCP user functions are checked, and allow execution to proceed only if no error code is returned: 
 
 \begin{lstlisting}[language=Ada,basicstyle=\small\ttfamily]
 Socket_Connect(Sock, Ip_Addr, Port, Error); 
 Socket_Send(Sock, Data, Written, Flags, Error);
 \end{lstlisting} 
 
-In the above scenario the post-condition of \spark{Socket_Connect} will set the value of \spark{Sock.S_Remote_Ip_Addr} if the function successfully executes, and thus, \spark{Error} is not equal to \spark{NO_ERROR}. In the case an error occurs, \spark{Sock.S_Remote_Ip_Addr} won't be initialized, and thus, the function \spark{Socket_Send} cannot be called because its precondition wont be satisfied.
+In the above scenario, the postcondition of \spark{Socket_Connect} specifies that \spark{Sock.S_Remote_Ip_Addr} is initialized only if the function successfully executes, and thus, \spark{Error} is equal to \spark{NO_ERROR}. In the case where an error occurs, nothing is specified about the value of \spark{Sock.S_Remote_Ip_Addr}, and thus, the function \spark{Socket_Send} cannot be called because its precondition won't be satisfied.
 
 \todo[inline]{KG: fixed up to here}
 
@@ -447,29 +447,32 @@ has been applied to the SPARK and C implementations of CycloneTCP.
 
 \section{Conclusion and future work}
 
-The use of SPARK for the verification of the TCP protocol has given good
-results. It has helped to find bugs in the existing implementation. But more
-than finding bugs, the interest of this work lie in the face that it is a
-step toward a secure implementation. It has been proved by the tool GNATprove
-that our implementation is free of run-time errors and that all the transitions
-in the TCP state machine are done with respect to the norm.
+We selectively applied formal verification to a layer of a TCP/IP library, by
+translating TCP user functions into SPARK, and modelling asynchronous events
+with ghost code. This allowed us to detect two bugs in the original C
+implementation, related to memory management and concurrency. This is a step
+towards a more secure implementation. The translated code has been proven to be
+free of run-time errors and to respect the transitions of the TCP state machine
+as specified in RFC 793.
 
-However weaknesses exist in our implementation, in particular because all the
-underlying layers are still written in C. The principal function of those layers
-is to format packet before they are sent, or parse incoming packets, check their
-integrity and transmit the resulting payload to the corresponding upper level
+These results depend upon other layers in the C programming language, which
+were not formally verified to the same level. Instead, we used symbolic
+execution with KLEE to formally verify the contracts used in SPARK to model the
+corresponding behaviors. The principal function of those layers
+is to format packets before they are sent, or parse incoming packets, check their
+integrity and transmit the resulting payload to the corresponding upper-level
 layer. This processing part can be a source of errors and bugs as explain
 in~\cite{Reiher2019RecordFluxFM}.
-Using the RecordFlux DSL to parse the packets of the different protocols is the
-next step to make the stack safer. Using RecordFlux to parse TCP message
-would be a big step to finish the translation of the TCP protocol in SPARK.
-The postconditions extracted by KLEE could be proved by GNATprove for a
-safer result.
+As an alternative to manual translation into SPARK, we envision 
+using the RecordFlux DSL to specify the parser and printer of the packets of the
+different protocols, and to generate provable SPARK code from this specification.
+This would complete our current verification of the CycloneTCP stack towards
+the lower layers.
 
-Our verification of the TCP protocol only focuses on the validity of the
-transitions in the TCP state machine, but some other properties are formulated
-in RFC 793, and could be verified in the implementation to make it even
-more robust.
+%Finally, our verification of the TCP protocol only focuses on the validity of the
+%transitions in the TCP state machine, but other properties are formulated
+%in RFC 793, and could be verified in the implementation to make it even
+%more robust.
 
 % examples of such properties?
 
