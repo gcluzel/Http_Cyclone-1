@@ -111,6 +111,8 @@ Existing research has dealt with formally verifying several protocols of TCP/IP 
 
 In this paper, we take a practical approach, where the security of an existing TCP/IP stack implementation written in ANSI C programming language is incrementally enhanced by replacing parts of its code with formally verified code in SPARK~\cite{mccormick_chapin_2015}, a subset of the Ada programming language supported by formal verification tools. We chose CycloneTCP, a professional-grade open source embedded TCP/IP library developed by the Oryx Embedded company~\cite{CycloneTCP}. \Cref{Fig:TcpStack} shows the protocols supported by the library. This work focuses on the TCP and Socket components of the stack. The library's TCP implementation is meant to conform with the RFC 793 protocol specifications~\cite{rfc793}. The quality of the CycloneTCP is acknowledged by the AMNESIA:33 report~\cite{AMNESIA33}, which classifies it as one of the most resilient TCP/IP stack.
 
+In total, for this work, 50 subprograms have been translated from C to SPARK. This accounts for 2266 lines of code, of which 1165 are SPARK logic code (e.g\.~ contracts) used to represent and prove the protocol's specification. The overall proving time with GNATprove is 9m and 54s on a 12-processor Intel(R) Core(TM) i7-9750H CPU with 2.60GHz speed and 16GB of RAM.
+
 \todo[inline]{KG:pending contributions list and fixing the next paragraph. Will be fixed when the rest of the paper is finalized.}
 
 We present the TCP protocol in section~\ref{sec:TCP} and then briefly the
@@ -323,18 +325,9 @@ Symbolic execution is used to verify that all the possible paths when executing 
 
 One of the most significant problems pointed to by the primary author of the \emph{CycloneTCP} library is the incorrect usage of the library's API. More specifically, the library's users tend to call the API functions in the wrong order and forget to check the return code of a function call. Thus, they are subsequently allowing their  TCP implementation to behave outside of the functional specification of the protocol. The following sections demonstrate how SPARK can be used to enforce the correct usage of the library.
 
-\todo[inline]{KG: fixed up to here}
-
 \subsection{Enforcing the correct order of API functions}
 
-The TCP protocol implies a specific order such that the user can call the API's
-functions without breaking the functional specification of the protocol. This
-order also is being conveyed by the protocol's state machine given in
-\Cref{Fig:statemachine}.
-Ada's preconditions and postconditions are a powerful tool to express such inter-function
-dependencies, while SPARK technology can be used to guarantee that the
-assertions always hold. Thus, preconditions and postconditions were introduced to model
-a partial order on the calls to the API's functions.
+The TCP protocol implies a specific order such that the user can call the API's functions without breaking the functional specification of the protocol. This order also is being conveyed by the protocol's state machine given in \Cref{Fig:statemachine}. Ada's preconditions and postconditions are a powerful tool to express such inter-function dependencies, while SPARK technology can be used to guarantee that the assertions always hold. Thus, preconditions and postconditions were introduced to model a partial order on the calls to the API's functions.
 
 \begin{figure}
 \begin{lstlisting}[language=Ada,basicstyle=\footnotesize\ttfamily]
@@ -366,29 +359,20 @@ postconditions}
 \label{fig:functionorder}
 \end{figure}
 
-Simplified contracts extracted from our library are reproduced in
-\Cref{fig:functionorder}. If no error occurs, the function
-\spark{Socket_Connect} sets \spark{Sock.S_Remote_Ip_Addr} to
-\spark{Remote_Ip_Addr} which is supposed to be
-initialized when the function is called. \spark{Socket_Send} requires to be
-called with a socket not null such that its field \spark{Remote_Ip_Addr} is
-initialized. The only way to ensure that the precondition hold is to
-call \spark{Socket_Connect} before \spark{Socket_Send}.
-The tool GNATprove can statically find if a call to \spark{Socket_Send}
-is not preceded by a call to \spark{Socket_Connect}.
+Simplified contracts extracted from our SPARK implementation are reproduced in \Cref{fig:functionorder}, to demonstrate how SPARK can be used to enforce the correct function calls' ordering. If no error occurs, the function \spark{Socket_Connect} sets \spark{Sock.S_Remote_Ip_Addr} to \spark{Remote_Ip_Addr} which is supposed to be initialized when the function is called. \spark{Socket_Send} requires to be called with a socket not null such that its field \spark{Remote_Ip_Addr} is initialized. The only way to ensure that the precondition hold is to call \spark{Socket_Connect} before \spark{Socket_Send}. The tool GNATprove can statically detect if a call to \spark{Socket_Send} is not preceded by a call to \spark{Socket_Connect}.
 
 \subsection{Checking the correctness of return codes}
 
-A common mistake is to forget to check the return codes after a call to a socket
-API's function. For instance, the following code would be reject by SPARK:
+The following code demonstrates how SPARK will enforce to the check of the return codes of a function and allow execution to proceed only if no error code is returned: 
+
 \begin{lstlisting}[language=Ada,basicstyle=\small\ttfamily]
-Socket_Connect(Sock, Ip_Addr, Port, Error);
+Socket_Connect(Sock, Ip_Addr, Port, Error); 
 Socket_Send(Sock, Data, Written, Flags, Error);
-\end{lstlisting}
-Indeed, if \spark{Socket_Connect} fails and \spark{Error} is not equal to
-\spark{NO_ERROR}, \spark{Sock.S_Remote_Ip_Addr} might be non initialized, and
-then the function \spark{Socket_Send} cannot be called because of its
-precondition.
+\end{lstlisting} 
+
+In the above scenario the post-condition of  \spark{Socket_Connect} will set the value of \spark{Sock.S_Remote_Ip_Addr} if the function succesfully executes, and thus, \spark{Error} is not equal to \spark{NO_ERROR}. In the case an error occurs, \spark{Sock.S_Remote_Ip_Addr} won't be initialized, and thus, the function \spark{Socket_Send} cannot be called because its precondition wont be satisfied.
+
+\todo[inline]{KG: fixed up to here}
 
 \section{Results}
 \label{sec:results}
@@ -466,16 +450,6 @@ precondition of \spark{TCP_Change_State}. The problem is detected by SPARK and a
 has been applied to the SPARK and C implementations of CycloneTCP.
 
 % The above is uncler, the transitions from CLOSED and CLOSED-WAIT are allowed, it's only the transition from ESTABLISHED which is not allowed.
-
-\subsection{Verified parts}
-
-For achieving this verification, 50 subprograms have been translated from C to
-SPARK. This accounts for \np{2266} lines of code of which \np{1165} are logical
-code to write and prove the specifications.
-
-The specifications are fully proved with GNATprove in 9m54s on a 12 processors with 16GB RAM laptop.
-
-% above: need time to prove automatically with GNATprove with the spec of your laptop (num of cores, amount of memory)
 
 \section{Conclusion and future work}
 
