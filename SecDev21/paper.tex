@@ -318,15 +318,12 @@ with KLEE}
 
 Symbolic execution is used to verify that all the possible paths when executing the \spark{tcpProcessSegment} function will result in a state that respects the RFC 793 extracted specifications. This process requires three steps shown in \Cref{code:kleedriver}. Firstly, a symbolic incoming segment is created, allowing to account for all possible incoming segments (see lines 1-4). Then at \cref{code:kleedriver:tcpProcessSegment}, function \texttt{tcpProcessSegment} is executed symbolically by KLEE. Finally, the assertion, \texttt{klee\_assert}, at \cref{code:kleedriver:assert} checks if the code leads to a valid state, one that is within the protocol's specification. If there is no raised assertion, then the contract represented by the assertion is deemed proved, and the relevant C code respects the protocol's specification regarding that contract. The assertion is then converted to a SPARK contract and added to the function \spark{TCP_Process_One_Segment}. This enables the SPARK prover to reason about the possible side-effects caused by the C-code on the state of a TCP connection and thus, enables the functional correctness verification of the TCP user functions. 
 
-\todo[inline]{KG: fixed up to here}
 \section{Hardening the user's API}
 \label{sec:API}
 
-A common problem faced by users of the CycloneTCP library is the need to
-properly chain calls of the Socket API, in a way that respects the TCP
-automaton. This entails verifying that 1)~the functions are called with respect
-to a defined order and 2)~the return code is checked before continuing the
-processing.
+One of the most significant problems pointed to by the primary author of the \emph{CycloneTCP} library is the incorrect usage of the library's API. More specifically, the library's users tend to call the API functions in the wrong order and forget to check the return code of a function call. Thus, they are subsequently allowing their  TCP implementation to behave outside of the functional specification of the protocol. The following sections demonstrate how SPARK can be used to enforce the correct usage of the library.
+
+\todo[inline]{KG: fixed up to here}
 
 \subsection{Enforcing the correct order of API functions}
 
