@@ -209,9 +209,7 @@ state machine described in figure~\ref{Fig:statemachine}. In particular, a trans
 
 \subsection{Rewriting the TCP user functions}
 
-The original \emph{CycloneTCP} library provides no guarantees that the implementation respects the TCP functional specification. Thus, there is no assurance that the implementation will only allow valid transitions between the different states that a TCP session can exhibit. We aim to use the SPARK technology to verify that the implementation respects the TCP automaton, given in \Cref{Fig:statemachine}. Although this work is focused on hardening the API of the user task, mainly the high-level user functions, to verify the state transitions, the rest of the TCP protocol has to be taken into account. The reason for this is two-fold. First, although user-functions can trigger state transitions, the actual transitions are done by library functions that do not belong to the user-task set of functions. Second, other parts of the library can trigger state transitions during and between the user-task function calls, which can affect the intermediate and final states that a user-related function can exhibit.
-
-The TCP user API-related functions were fully translated to SPARK. SPARK bindings were also provided to most of the rest of the library's C functions to allow their invocation from the SPARK code.
+The original \emph{CycloneTCP} library provides no guarantees that the implementation respects the TCP functional specification. Thus, there is no assurance that the implementation will only allow valid transitions between the different states that a TCP session can exhibit. We aim to use the SPARK technology to verify that the implementation respects the TCP automaton, given in \Cref{Fig:statemachine}. The work is focused on hardening the API of the user task, mainly the high-level user functions, to verify the state transitions. To achieve this, the rest of the TCP protocol, not related to the user task, also has to be taken into account. The reason for this is two-fold. First, although user-functions can trigger state transitions, the actual transitions are done by library functions that do not belong to the user-task set of functions. Second, other parts of the library can trigger state transitions during and between the user-task function calls, which can affect the intermediate and final states that a user-related function can exhibit. The TCP user API-related functions were fully translated to SPARK. SPARK bindings were also provided to most of the rest of the library's C functions to allow their invocation from the SPARK code.
 
 RFC 793 document provides all the information needed for the allowed transitions between the different TCP possible states. For any transitions directly triggered by the call of the user-task functions, SPARK contracts, representing transitions allowed by the functional specification, are embedded within the SPARK translated code. The \texttt{TCP\_Change\_State} is a helper function that is called every time a state transition needs to be made to update the socket's state. An incorrect transition allowed by the code will be detected by the prover.
 
@@ -370,14 +368,12 @@ Socket_Connect(Sock, Ip_Addr, Port, Error);
 Socket_Send(Sock, Data, Written, Flags, Error);
 \end{lstlisting} 
 
-In the above scenario the post-condition of  \spark{Socket_Connect} will set the value of \spark{Sock.S_Remote_Ip_Addr} if the function succesfully executes, and thus, \spark{Error} is not equal to \spark{NO_ERROR}. In the case an error occurs, \spark{Sock.S_Remote_Ip_Addr} won't be initialized, and thus, the function \spark{Socket_Send} cannot be called because its precondition wont be satisfied.
+In the above scenario the post-condition of \spark{Socket_Connect} will set the value of \spark{Sock.S_Remote_Ip_Addr} if the function successfully executes, and thus, \spark{Error} is not equal to \spark{NO_ERROR}. In the case an error occurs, \spark{Sock.S_Remote_Ip_Addr} won't be initialized, and thus, the function \spark{Socket_Send} cannot be called because its precondition wont be satisfied.
 
 \todo[inline]{KG: fixed up to here}
 
-\section{Results}
+\section{Bugs Captured}
 \label{sec:results}
-
-\subsection{Bugs found}
 
 \subsubsection{Memory leak}
 
