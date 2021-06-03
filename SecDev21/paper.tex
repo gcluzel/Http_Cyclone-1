@@ -374,11 +374,9 @@ In the above scenario, the postcondition of \spark{Socket_Connect} specifies tha
 
 The pointer ownership policy of SPARK, detailed in \Cref{sec:pointers}, enabled the detection of a memory leak when a socket closes. This was present due to partially freeing the memory allocated for the buffer that stores the incoming segments. This bug was due to using the wrong library function call to free the memory. SPARK ownership policy detected this because, after the call to this function, the pointer to the buffer was declared not own anymore, but the memory pointed by that pointer was partially deallocated.
 
-\todo[inline]{KG: fixed up to here}
 \subsubsection{Violation of the TCP protocol}
 
-A subtle bug found thanks to SPARK is
-reproduced in the snippet below.
+A subtle bug that violates the protocol's extracted specifications captured by SPARK is reproduced below:
 
 \begin{lstlisting}[language=Ada, basicstyle=\footnotesize\ttfamily,
                     numbers=left, numberstyle=\tiny, escapechar=\%]
@@ -424,20 +422,9 @@ case Sock.State is
   TCP_Change_State (Sock, TCP_STATE_FIN_WAIT_1); % \label{bugProg:tcpChangeState} %
 \end{lstlisting}
 
-In this scenario, after the call to \spark{Tcp_Send}, when the error cases have
-been filtered, the state of the socket can either be \sestab or \sclosew. After the call
-at line~\ref{bugProg:tcpWaitForEvents}, the state of the socket can
-still be \sestab or \sclosew, or it can be \sclosed if a \rst flag has been received when the mutex
-was released.
-At line~\ref{bugProg:tcpWaitForEventsPost}, a \fin segment is sent, which does
-not modify the state of the socket. Finally, at line~\ref{bugProg:tcpChangeState}
-we try to jump to the state \sfwone and thus the transitions $\text{\sclosew}
-\rightarrow \text{\sfwone}$ and $\text{\sclosed} \rightarrow \text{\sfwone}$ are
-possible.
+In the original implementation, after the call to \spark{Tcp_Send}, if no error occurs, the state of the socket can either be \sestab or \sclosew. After the call at line~\ref{bugProg:tcpWaitForEvents}, the state of the socket can still be \sestab or \sclosew, or \sclosed if a \rst flag has been received when the mutex was released. At line~\ref{bugProg:tcpWaitForEventsPost}, a \fin segment is sent, which does not modify the state of the socket. Finally, at line~\ref{bugProg:tcpChangeState} the code tries to move the connection to the \sfwone state, and thus, the transitions $\text{\sclosew} \rightarrow \text{\sfwone}$ and $\text{\sclosed} \rightarrow \text{\sfwone}$ are possible.
 
-But these transitions are not allowed by RFC 793, and thus not allowed by the
-precondition of \spark{TCP_Change_State}. The problem is detected by SPARK and a fix
-has been applied to the SPARK and C implementations of CycloneTCP.
+These transitions are not allowed by RFC 793, and thus, not allowed by the precondition of \spark{TCP_Change_State}, which models all the allowed transitions by the protocol's specification. The problem was both corrected in the C original implementation and the SPARK translated code.
 
 % The above is uncler, the transitions from CLOSED and CLOSED-WAIT are allowed, it's only the transition from ESTABLISHED which is not allowed.
 
