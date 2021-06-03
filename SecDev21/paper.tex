@@ -367,17 +367,14 @@ Socket_Send(Sock, Data, Written, Flags, Error);
 
 In the above scenario, the postcondition of \spark{Socket_Connect} specifies that \spark{Sock.S_Remote_Ip_Addr} is initialized only if the function successfully executes, and thus, \spark{Error} is equal to \spark{NO_ERROR}. In the case where an error occurs, nothing is specified about the value of \spark{Sock.S_Remote_Ip_Addr}, and thus, the function \spark{Socket_Send} cannot be called because its precondition won't be satisfied.
 
-\todo[inline]{KG: fixed up to here}
-
 \section{Bugs Captured}
 \label{sec:results}
 
 \subsubsection{Memory leak}
 
-Thanks to the pointer ownership policy adopted by SPARK and detailed in
-section~\ref{sec:pointers}, we have found that a memory leak can happen when
-the connection has been closed and the buffer are cleaning.
+The pointer ownership policy of SPARK, detailed in \Cref{sec:pointers}, enabled the detection of a memory leak when a socket closes. This was present due to partially freeing the memory allocated for the buffer that stores the incoming segments. This bug was due to using the wrong library function call to free the memory. SPARK ownership policy detected this because, after the call to this function, the pointer to the buffer was declared not own anymore, but the memory pointed by that pointer was partially deallocated.
 
+\todo[inline]{KG: fixed up to here}
 \subsubsection{Violation of the TCP protocol}
 
 A subtle bug found thanks to SPARK is
