@@ -330,7 +330,7 @@ One of the most significant problems pointed to by the primary author of the \em
 The TCP protocol implies a specific order such that the user can call the TCP user functions without breaking the functional specification of the protocol. This order is also being conveyed by the protocol's state machine given in \Cref{Fig:statemachine}. Ada's preconditions and postconditions are a powerful tool to express such inter-function dependencies, while SPARK technology can be used to guarantee that the assertions always hold. Thus, preconditions and postconditions were introduced to model a partial order on the calls to the TCP user functions.
 
 \begin{figure}
-\begin{lstlisting}[language=Ada,basicstyle=\footnotesize\ttfamily]
+\begin{lstlisting}[language=Ada,basicstyle=\footnotesize\ttfamily, frame=bottomline]
 procedure Socket_Connect
    (Sock           : in out Not_Null_Socket;
     Remote_Ip_Addr : in     IpAddr;
@@ -390,7 +390,8 @@ freed, due to the use of the wrong library function to free the memory.
 A subtle bug violating TCP specification is reproduced below:
 
 \begin{lstlisting}[language=Ada, basicstyle=\footnotesize\ttfamily,
-                    numbers=left, numberstyle=\tiny, escapechar=\%]
+                    numbers=left, numberstyle=\tiny, escapechar=\%,
+                    numbersep=0pt]
 case Sock.State is
   when TCP_STATE_SYN_RECEIVED
      | TCP_STATE_ESTABLISHED =>
