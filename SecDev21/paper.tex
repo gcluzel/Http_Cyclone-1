@@ -72,7 +72,7 @@
 
 \begin{document}
 
-\title{Layered Formal Verification of a TCP/IP Stack}
+\title{Layered Formal Verification of a TCP Stack}
 
 \author{%
 \IEEEauthorblockN{Guillaume Cluzel}
@@ -91,7 +91,12 @@
 \maketitle
 
 \begin{abstract}
-\todo{Write the abstract.}
+The Transmission Control Protocol (TCP) at the heart of TCP/IP protocol stacks
+is a critical part of our current digital infrastructure. In this article, we
+show how an existing professional-grade open source embedded TCP/IP library can
+benefit from a formally verified TCP reimplementation. Our approach is to apply
+formal verification to the TCP layer only, relying on validated models of the
+lower layers on which it depends.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -111,9 +116,9 @@ Existing research has dealt with formally verifying several protocols of the TCP
 
 In this paper, we take a practical approach, where the security of an existing TCP/IP stack implementation written in the C programming language is incrementally enhanced by replacing parts of its code with formally verified code in SPARK~\cite{mccormick_chapin_2015}, a subset of the Ada programming language supported by formal verification tools. We chose CycloneTCP, a professional-grade open source embedded TCP/IP library developed by the Oryx Embedded company~\cite{CycloneTCP}. \Cref{Fig:TcpStack} shows the protocols supported by the library. This work focuses on the TCP and Socket components of the stack. The library's TCP implementation is meant to conform to the RFC 793 protocol specifications~\cite{rfc793}. The quality of the CycloneTCP is acknowledged by the AMNESIA:33 report~\cite{AMNESIA33}, which classifies it as one of the most resilient TCP/IP stack.
 
-In total, for this work, 50 subprograms have been translated from C to SPARK. This accounts for 2266 lines of code, of which 1165 are SPARK logic code (e.g.\ contracts) used to represent and prove the protocol's specification. The overall proving time with GNATprove is 9m and 54s on a 12-processor Intel(R) Core(TM) i7-9750H CPU with 2.60GHz speed and 16GB of RAM.
+In total, for this work, 50 subprograms have been translated from C to SPARK. This accounts for 2266 lines of code, of which 1165 are SPARK logic code (e.g.\ contracts) used to represent and prove TCP specification. The overall proving time with GNATprove is 10 minutes on a 12-processor Intel(R) Core(TM) i7-9750H CPU with 2.60GHz speed and 16GB of RAM.
 
-%\todo[inline]{KG:pending contributions list and fixing the next paragraph. Will be fixed when the rest of the paper is finalized.}
+The contributions of this article are the following. First, we show that formal verification can be applied selectively to a layer of an existing TCP/IP library, by translating the TCP layer to SPARK and modelling the lower layers on which it depends. The benefits are three-fold: we found two bugs in the TCP layer, we proved the correction of that layer, and we defined formal contracts for the upper layers to call the TCP layer. Second, we showed how the models of the lower layers can be validated by symbolic execution with KLEE on the C code of those layers.
 
 We present the TCP protocol in section~\ref{sec:TCP} and the specification
 techniques used in section~\ref{sec:spec}. We explain how we formally
@@ -147,7 +152,7 @@ The state machine in \Cref{Fig:statemachine} does not represent the complete pro
 %\subsection{TCP Multitasking model}
 
 TCP is based on a multitasking model. Different tasks can interact and update the socket data structure, used to retain the status of a TCP connection, to handle the various events that can occur within a TCP session. RFC 793, under Section ``3.9. Event Processing'' page 52, describes a possible implementation of how to handle these events based on three tasks: one for the \emph{user calls}, one for the \emph{arriving segments} and one for the \emph{timers}. The role of each of the three tasks can be summarized as follows. User calls refer to functions, namely \texttt{open}, \texttt{close}, \texttt{abort}, \texttt{send} and \texttt{receive}, that can be called by the user to control the connection, send, or receive data. These functions can trigger transitions between the connection's states since they are intended to control the connection. In the arriving segments task, the received segments are being processed,
-and the corresponding messages are sent back. Transitions between states can be triggered on the reception of a segment. Finally, timers control the timeouts, for example, the retransmission timeout to retransmit a message or the time-wait timeout to close the connection after a specified amount of time elapsed. Thus, transitions corresponding to the timeout events can also be triggered by this task. A complete description of the protocol's specification can be found in the RFC 793 document~\cite{rfc793}.
+and the corresponding messages are sent back. Transitions between states can be triggered on the reception of a segment. Finally, timers control the timeouts, for example, the retransmission timeout to retransmit a message or the time-wait timeout to close the connection after a specified amount of time elapsed. Thus, transitions corresponding to the timeout events can also be triggered by this task. A complete description of TCP specification can be found in the RFC 793 document~\cite{rfc793}.
 
 The CycloneTCP implementation adopts the three-task-based model and the socket data structure defined by the RFC 793. Thus, it has tasks dedicated to the user's code, to the timers, and to the processing of incoming segments. Moreover, the user can manipulate a socket through the TCP's library Application Programming Interface (API) to perform various TCP operations, such as data transmission.
 
@@ -180,7 +185,7 @@ In the CycloneTCP library, pointers are used both as the type of variables to pa
 
 \subsection{Specifying the frame condition}
 
-The socket structure is shared between different functions and contains a large number of fields. Most of the fields are used in library parts that are not considered by this work, and thus, are not relevant for our verification. Thus we use \emph{ghost code} in SPARK to focus the verification effort on the relevant subset of the fields, which also makes the specifications easier to write and understand. This is a solution to the classical problem of specifying the \emph{frame condition} for a function, that is, the set of objects possibly modified by the function. \emph{Ghost code} is used by GNATprove for analysis but is not being compiled in the final executable. More specifically, we define a \emph{model} of the actual socket as a ghost function that can be used in contracts: \spark{Model(Sock)} extracts the fields of interest from socket \spark{Sock}. A common usage is within a function postcondition: 
+The socket structure is shared between different functions and contains a large number of fields. Most of the fields are used in library parts that are not considered by this work, and thus, are not relevant for our verification. Thus we use \emph{ghost code} in SPARK to focus the verification effort on the relevant subset of the fields, which also makes the specifications easier to write and understand. This is a solution to the classical problem of specifying the \emph{frame condition} for a function, that is, the set of objects possibly modified by the function. \emph{Ghost code} is used by GNATprove for analysis but is not being compiled in the final executable. More specifically, we define a \emph{model} of the actual socket as a ghost function that can be used in contracts: \spark{Model(Sock)} extracts the fields of interest from socket \spark{Sock}. A common usage is within a function postcondition:
 
 \begin{lstlisting}[language=Ada, basicstyle=\small\ttfamily]
 Model(Sock) = (Model(Sock)'Old with delta
@@ -280,7 +285,7 @@ The behavior of \spark{TCP_Wait_For_Events} is modeled by the ghost function \sp
 
 \subsection{Symbolic execution to extract contracts}
 
-The soundness of our verification requires all the contracts to be complete and correct; all the possible state transitions of a TCP connection must be modeled and proved.  In particular, this is true for the contract of \spark{TCP_Process_One_Segment} that is used to prove the function \spark{TCP_Wait_For_Events}, as it models calls to parts of the library in C that are not proved. To overcome this issue, symbolic execution was used on the original CycloneTCP C code to exhaustively verify any contracts related to transitions triggered from the C parts of the library. 
+The soundness of our verification requires all the contracts to be complete and correct; all the possible state transitions of a TCP connection must be modeled and proved.  In particular, this is true for the contract of \spark{TCP_Process_One_Segment} that is used to prove the function \spark{TCP_Wait_For_Events}, as it models calls to parts of the library in C that are not proved. To overcome this issue, symbolic execution was used on the original CycloneTCP C code to exhaustively verify any contracts related to transitions triggered from the C parts of the library.
 
 Symbolic execution is a means of executing programs with symbolic values rather than concrete values \cite{symbolic_exec_survey:2018}. Exhaustive symbolic execution can be considered sound and complete (it prevents false negatives and false positives), and thus, it is complementary to formal verification. In \cite{vanoverberghe2008using}, the authors present how symbolic execution can be used to improve deductive verification, and in \cite{kassios2012comparing} the authors demonstrated the technique's value in inferring contracts. For our work, the KLEE v2.1 symbolic execution engine is used \cite{KLEE}. KLEE is built upon the LLVM optimizer's bytecode, and it offers a very simple yet powerful C interface.
 
@@ -313,7 +318,7 @@ with KLEE}
 \label{code:kleedriver}
 \end{figure}
 
-Symbolic execution is used to verify that all the possible paths when executing the \spark{tcpProcessSegment} function will result in a state that respects the RFC 793 extracted specifications. This process requires three steps shown in \Cref{code:kleedriver}. Firstly, a symbolic incoming segment is created, allowing to account for all possible incoming segments (see lines 1-4). Then at \cref{code:kleedriver:tcpProcessSegment}, function \texttt{tcpProcessSegment} is executed symbolically by KLEE. Finally, the assertion, \texttt{klee\_assert}, at \cref{code:kleedriver:assert} checks if the code leads to a valid state, one that is within the protocol's specification. If there is no raised assertion, then the contract represented by the assertion is deemed proved, and the relevant C code respects the protocol's specification regarding that contract. The assertion is then converted to a SPARK contract and added to the function \spark{TCP_Process_One_Segment}. This enables the SPARK prover to reason about the possible side-effects caused by the C-code on the state of a TCP connection and thus, enables the functional correctness verification of the TCP user functions. 
+Symbolic execution is used to verify that all the possible paths when executing the \spark{tcpProcessSegment} function will result in a state that respects the RFC 793 extracted specifications. This process requires three steps shown in \Cref{code:kleedriver}. Firstly, a symbolic incoming segment is created, allowing to account for all possible incoming segments (see lines 1-4). Then at \cref{code:kleedriver:tcpProcessSegment}, function \texttt{tcpProcessSegment} is executed symbolically by KLEE. Finally, the assertion, \texttt{klee\_assert}, at \cref{code:kleedriver:assert} checks if the code leads to a valid state, one that is within TCP specification. If there is no raised assertion, then the contract represented by the assertion is deemed proved, and the relevant C code respects TCP specification regarding that contract. The assertion is then converted to a SPARK contract and added to the function \spark{TCP_Process_One_Segment}. This enables the SPARK prover to reason about the possible side-effects caused by the C-code on the state of a TCP connection and thus, enables the functional correctness verification of the TCP user functions.
 
 \section{Hardening the user's API}
 \label{sec:API}
@@ -358,25 +363,31 @@ Simplified contracts extracted from our SPARK implementation are reproduced in \
 
 \subsection{Checking the correctness of return codes}
 
-The following code demonstrates how SPARK will enforce that return codes of TCP user functions are checked, and allow execution to proceed only if no error code is returned: 
+The following code demonstrates how SPARK will enforce that return codes of TCP user functions are checked, and allow execution to proceed only if no error code is returned:
 
 \begin{lstlisting}[language=Ada,basicstyle=\small\ttfamily]
-Socket_Connect(Sock, Ip_Addr, Port, Error); 
+Socket_Connect(Sock, Ip_Addr, Port, Error);
 Socket_Send(Sock, Data, Written, Flags, Error);
-\end{lstlisting} 
+\end{lstlisting}
 
 In the above scenario, the postcondition of \spark{Socket_Connect} specifies that \spark{Sock.S_Remote_Ip_Addr} is initialized only if the function successfully executes, and thus, \spark{Error} is equal to \spark{NO_ERROR}. In the case where an error occurs, nothing is specified about the value of \spark{Sock.S_Remote_Ip_Addr}, and thus, the function \spark{Socket_Send} cannot be called because its precondition won't be satisfied.
 
 \section{Bugs Captured}
 \label{sec:results}
 
+As a result of this work, two bugs were detected and reported to the authors of
+CycloneTCP, and they fixed them in the C implementation.
+
 \subsubsection{Memory leak}
 
-The pointer ownership policy of SPARK, detailed in \Cref{sec:pointers}, enabled the detection of a memory leak when a socket closes. This was present due to partially freeing the memory allocated for the buffer that stores the incoming segments. This bug was due to using the wrong library function call to free the memory. SPARK ownership policy detected this because, after the call to this function, the pointer to the buffer was declared not own anymore, but the memory pointed by that pointer was partially deallocated.
+A memory leak was detected thanks to the pointer ownership policy of SPARK
+detailed in \Cref{sec:pointers}. When closing a socket, the associated memory
+allocated for the buffer that stores incoming segments was only partially
+freed, due to the use of the wrong library function to free the memory.
 
 \subsubsection{Violation of the TCP protocol}
 
-A subtle bug that violates the protocol's extracted specifications captured by SPARK is reproduced below:
+A subtle bug violating TCP specification is reproduced below:
 
 \begin{lstlisting}[language=Ada, basicstyle=\footnotesize\ttfamily,
                     numbers=left, numberstyle=\tiny, escapechar=\%]
@@ -423,10 +434,7 @@ case Sock.State is
 \end{lstlisting}
 
 In the original implementation, after the call to \spark{Tcp_Send}, if no error occurs, the state of the socket can either be \sestab or \sclosew. After the call at line~\ref{bugProg:tcpWaitForEvents}, the state of the socket can still be \sestab or \sclosew, or \sclosed if a \rst flag has been received when the mutex was released. At line~\ref{bugProg:tcpWaitForEventsPost}, a \fin segment is sent, which does not modify the state of the socket. Finally, at line~\ref{bugProg:tcpChangeState} the code tries to move the connection to the \sfwone state, and thus, the transitions $\text{\sclosew} \rightarrow \text{\sfwone}$ and $\text{\sclosed} \rightarrow \text{\sfwone}$ are possible.
-
-These transitions are not allowed by RFC 793, and thus, not allowed by the precondition of \spark{TCP_Change_State}, which models all the allowed transitions by the protocol's specification. The problem was both corrected in the C original implementation and the SPARK translated code.
-
-% The above is uncler, the transitions from CLOSED and CLOSED-WAIT are allowed, it's only the transition from ESTABLISHED which is not allowed.
+These transitions are not allowed by RFC 793, and thus, not allowed by the precondition of \spark{TCP_Change_State}, which models all the transitions allowed by TCP specification. Thus GNATprove reported an unproved precondition check here.
 
 \section{Conclusion and future work}
 
