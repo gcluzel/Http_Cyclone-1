@@ -116,9 +116,7 @@ Existing research has dealt with formally verifying several protocols of the TCP
 
 In this paper, we take a practical approach, where the security of an existing TCP/IP stack implementation written in the C programming language is incrementally enhanced by replacing parts of its code with formally verified code in SPARK~\cite{mccormick_chapin_2015}, a subset of the Ada programming language supported by formal verification tools. We chose CycloneTCP, a professional-grade open source embedded TCP/IP library developed by the Oryx Embedded company~\cite{CycloneTCP}. \Cref{Fig:TcpStack} shows the protocols supported by the library. This work focuses on the TCP and Socket components of the stack. The library's TCP implementation is meant to conform to the RFC 793 protocol specifications~\cite{rfc793}. The quality of the CycloneTCP is acknowledged by the AMNESIA:33 report~\cite{AMNESIA33}, which classifies it as one of the most resilient TCP/IP stacks.
 
-In total, for this work, 50 functions have been translated from C to SPARK. This accounts for 2266 lines of code, of which 1165 are SPARK logic code (e.g.\ contracts) used to represent and prove TCP specification. The overall proving time with GNATprove from the Community 2021 release is 10 minutes on a 12-processor Intel(R) Core(TM) i7-9750H CPU with 2.60GHz speed and 16GB of RAM. The tools and code are freely available online.
-
-The contributions of this article are the following. First, we show that formal verification can be applied selectively to a layer of an existing TCP/IP library, by translating the TCP layer to SPARK and modelling the lower layers on which it depends. The benefits are three-fold: we found and corrected two bugs in the TCP layer, we proved the correction of that layer, and we defined formal contracts for the upper layers to call the TCP layer. Second, we showed how the models of the lower layers can be validated by symbolic execution with KLEE on the C code of those layers.
+The contributions of this article are the following. First, we show that formal verification can be applied selectively to a layer of an existing TCP/IP library, by translating the TCP layer to SPARK and modelling the lower layers on which it depends. The benefits are three-fold: we found and corrected two bugs in the TCP layer, we proved the correction of that layer, and we defined formal contracts for the upper layers to call the TCP layer. Second, we showed how the models of the lower layers can be validated by symbolic execution with KLEE on the C code of those layers. The tools and code\footnote{\url{https://github.com/Adacore/Http_Cyclone}} are freely available online.
 
 We present the TCP protocol in section~\ref{sec:TCP} and the specification
 techniques used in section~\ref{sec:spec}. We explain how we formally
@@ -131,7 +129,7 @@ summary of the results of our work in section~\ref{sec:results}.
 
 \input{Automaton.tex}
 
-TCP is a connection-oriented protocol; a connection between the sender and the receiver must be established before transmitting any data. Furthermore, TCP is a reliable protocol since it guarantees the delivery of all the messages and that they are delivered in the order they were sent. It also provides error-checking mechanisms to discard and recover from corrupted data.
+TCP is a connection-oriented protocol; a connection between the sender and the receiver must be established before transmitting any data. Furthermore, TCP is a reliable protocol since it guarantees the delivery of all the messages in absence of a network outage and that they are delivered in the order they were sent. It also provides error-checking mechanisms to discard and recover from corrupted data.
 
 %\subsection{TCP state machine}
 
@@ -154,7 +152,7 @@ The state machine in \Cref{Fig:statemachine} does not represent the complete pro
 TCP is based on a multitasking model. Different tasks can interact and update the socket data structure, used to retain the status of a TCP connection, to handle the various events that can occur within a TCP session. RFC 793, under Section ``3.9. Event Processing'' page 52, describes a possible implementation of how to handle these events based on three tasks: one for the \emph{user calls}, one for the \emph{arriving segments} and one for the \emph{timers}. The role of each of the three tasks can be summarized as follows. \textit{User calls} refer to functions, namely \texttt{open}, \texttt{close}, \texttt{abort}, \texttt{send} and \texttt{receive}, that can be called by the user to control the connection, send, or receive data. These functions can trigger transitions between the connection's states since they are intended to control the connection. In the \textit{arriving segments} task, the received segments are being processed,
 and the corresponding messages are sent back. Transitions between states can be triggered on the reception of a segment. Finally, \textit{timers} control the timeouts, for example, the retransmission timeout to retransmit a message or the time-wait timeout to close the connection after a specified amount of time elapsed. Thus, transitions corresponding to the timeout events can also be triggered by this task. A complete description of TCP specification can be found in the RFC 793 document~\cite{rfc793}.
 
-The CycloneTCP implementation adopts the three-task-based model and the socket data structure defined by the RFC 793. Thus, it has tasks dedicated to the user's code, to the timers, and to the processing of incoming segments. Moreover, the user can manipulate a socket through the TCP's library Application Programming Interface (API) to perform various TCP operations, such as data transmission.
+The CycloneTCP implementation adopts the three-task-based model and the socket data structure defined by the RFC 793. Thus, it has tasks dedicated to the user's code, to the timers, and to the processing of incoming segments. These  three tasks communicate together, either synchronously: a task requests for an action to be done by another task; or asynchronously: some actions are performed on a socket by a task between two uses of the socket. All the uses of a socket are protected by a global mutex, common to all the sockets. It ensures that only one task can modify a socket at the same time.
 
 \section{Specification techniques used}
 \label{sec:spec}
@@ -173,7 +171,7 @@ By subsetting Ada, the SPARK programming language \cite{mccormick_chapin_2015} p
 
 The verification of the entire functional specification of the CycloneTCP library is beyond the scope of this work. Instead, the aim is to provide significant security hardening to mostly-C libraries by selective use of SPARK. Thus, this work focuses on the hardening of the TCP library areas that its original authors designated as the most vulnerable or crucial to conform to their functional specifications, namely, the API. This mainly falls under two categories: a) proving the conformance to the protocol's functional specification for the translated code, discussed in \Cref{sec:verif}, and b) hardening the user's API to enforce its correct usage by users, discussed in \Cref{sec:API}.
 
-Ada and SPARK offer an easy-to-use mechanism for interfacing with C code. The mechanism allows C-written functions to be called by Ada/SPARK code and vice versa and for representing shared data objects. The memory representations of a shared data object must be the same in both the C and the SPARK code. For instance, if a C function is called with a 32-bit integer argument, the SPARK interface of this function should also be called with a 32-bits integer argument. It is the responsibility of the user to ensure this property.
+Ada and SPARK offer an easy-to-use mechanism for interfacing with C code. The mechanism allows C-written functions to be called by Ada/SPARK code and vice versa and for representing shared data objects. The memory representations of a shared data object must be the same in both the C and the SPARK code. For instance, if a C function is called with a 32-bits integer argument, the SPARK interface of this function should also be called with a 32-bits integer argument. It is also true for the structures. It is the responsibility of the user to ensure this property. Nevertheless, the compiler GCC offers an option \texttt{-fdump-ada-spec} that helps the user in writing correct Ada specifications by generating them directly from the C code. The layout of the structures are then the same by construction in C and SPARK.
 
 Although formal verification can only be applied to the SPARK translated code,  preconditions and postconditions can be attached to C functions interfaced in SPARK to allow reasoning about the side effects of calling these functions by the SPARK code. Since the functional specification of these contracts cannot be proved, it is the programmer's role to ensure their correctness. Interfacing C and SPARK code can be error-prone if it is not done carefully. \Cref{sec:verif} discusses how to mitigate this issue effectively.
 
@@ -193,7 +191,7 @@ Model(Sock) = (Model(Sock)'Old with delta
 \end{lstlisting}
 
 \noindent
-This states that the fields of \spark{Sock} used by \spark{Model} are not changed by the function call, except for the field \spark{State} that is equal to \spark{TCP_STATE_CLOSED} after the call.
+This states that the fields of \spark{Sock} used by \spark{Model} are not changed by the function call, except for the field \spark{State} that is equal to \spark{TCP_STATE_CLOSED} after the call. Nothing is stated on the field that are not selected by \spark{Model(Sock)}. In particular they can have changed during the execution of the function or not.
 
 \section{Conformance to the TCP protocol}
 \label{sec:verif}
@@ -231,7 +229,7 @@ RFC 793 provides all the information needed for the allowed transitions between 
 % functions.
 
 
-The concurrent implementation of the TCP protocol allows for multiple interactions between the tasks, both synchronous (with a call to \spark{TCP_Wait_For_Events}) and asynchronous (between two user function calls), and thus, numerous possible state changes at any given moment. This makes the functional specification verification significantly challenging, as SPARK does not have a native mode to deal precisely with interactions related to concurrency. To address this, we introduced SPARK functions with contracts that model how the different possible interactions can modify the state of a socket. Finding a correct and precise contract for \spark{TCP_Wait_For_Events} was challenging but needed for the verification of the TCP user functions. The solution is elaborated in the following section.
+The concurrent implementation of the TCP protocol allows for multiple interactions between the tasks, both synchronous (with a call to \spark{TCP_Wait_For_Events}) and asynchronous (between two user function calls), and thus, numerous possible state changes at any given moment. This makes the functional specification verification significantly challenging, as SPARK does not have a native mode to deal precisely with interactions related to concurrency. To address this, we avoid using concurrency in SPARK and instead we introduced sequential SPARK functions with contracts that model how the different possible interactions can modify the state of a socket. Finding a correct and precise contract for \spark{TCP_Wait_For_Events} was challenging but needed for the verification of the TCP user functions. The solution is elaborated in the following section.
 
 
 \subsection{Dealing with synchronous exchanges}
@@ -318,7 +316,9 @@ with KLEE}
 \label{code:kleedriver}
 \end{figure}
 
-Symbolic execution is used to verify that all the possible paths when executing the \spark{tcpProcessSegment} function will result in a state that respects the RFC 793 extracted specifications. This process requires three steps shown in \Cref{code:kleedriver}. Firstly, a symbolic incoming segment is created, allowing to account for all possible incoming segments (see lines 1-4). Then at \cref{code:kleedriver:tcpProcessSegment}, function \texttt{tcpProcessSegment} is executed symbolically by KLEE. Finally, the assertion, \texttt{klee\_assert}, at \cref{code:kleedriver:assert} checks if the code leads to a valid state, one that is within the TCP specification. If there is no raised assertion, then the contract represented by the assertion is deemed proved, and the relevant C code respects the TCP specification regarding that contract. The assertion is then converted to a SPARK contract and added to the function \spark{TCP_Process_One_Segment}. This enables the SPARK prover to reason about the possible side-effects caused by the C-code on the state of a TCP connection and thus, enables the functional correctness verification of the TCP user functions.
+Symbolic execution is used to verify that all the possible paths when executing the \spark{tcpProcessSegment} function will result in a state that respects the RFC 793 extracted specifications. This process requires three steps shown in \Cref{code:kleedriver}. Firstly, a symbolic incoming segment is created, allowing to account for all possible incoming segments (see lines 1-4). Then at \cref{code:kleedriver:tcpProcessSegment}, function \texttt{tcpProcessSegment} is executed symbolically by KLEE. Finally, the assertion, \texttt{klee\_assert}, at \cref{code:kleedriver:assert} checks if the code leads to a valid state, one that is within the TCP specification. If there is no raised assertion, then the contract represented by the assertion is deemed proved, and the relevant C code respects the TCP specification regarding that contract. The assertion is then manually converted to a SPARK contract and added to the function \spark{TCP_Process_One_Segment}. This enables the SPARK prover to reason about the possible side-effects caused by the C-code on the state of a TCP connection and thus, enables the functional correctness verification of the TCP user functions.
+
+Using KLEE on the function that process incoming segments helped us to make faster the verification of the user function. Applied to the user function, this method would not have been enough. KLEE can only unroll loops when the loops present in the user functions can finish after a high number of iterations which may leads to a combinatorial explosion in the number of paths explored by KLEE. KLEE has other limitations that were useful in SPARK for our verification like the detection of memory leaks.
 
 \section{Hardening the user's API}
 \label{sec:API}
@@ -327,7 +327,7 @@ One of the most significant problems pointed to by the primary author of the \em
 
 \subsection{Enforcing the correct order of TCP user functions}
 
-The TCP protocol implies a specific order such that the user can call the TCP user functions without breaking the functional specification of the protocol. This order is also conveyed by the protocol's state machine given in \Cref{Fig:statemachine}. Ada's preconditions and postconditions are a powerful tool to express such inter-function dependencies, while SPARK technology can be used to guarantee that the assertions always hold. Thus, preconditions and postconditions were introduced to model a partial order on the calls to the TCP user functions.
+The TCP protocol implies a specific order such that the user can call the TCP user functions without breaking the functional specification of the protocol. This order is also conveyed by the protocol's state machine given in \Cref{Fig:statemachine}. Ada's preconditions and postconditions are a powerful tool to express such inter-function dependencies, while SPARK technology can be used to guarantee that the assertions always hold. Thus, preconditions and postconditions were introduced to model a partial order on the calls to the TCP user functions. The pre- and postconditions in Ada can be enabled with a pragm in order to be checked at the runtime to assure, even if they are not previously verified with SPARK, that they are still true when the program is running.
 
 \begin{figure}
 \begin{lstlisting}[language=Ada,basicstyle=\footnotesize\ttfamily, frame=bottomline]
@@ -436,6 +436,15 @@ case Sock.State is
 
 In the original implementation, after the call to \spark{Tcp_Send}, if no error occurs, the state of the socket can either be \sestab or \sclosew. After the call at line~\ref{bugProg:tcpWaitForEvents}, the state of the socket can still be \sestab or \sclosew, or \sclosed if a \rst flag has been received when the mutex was released. At line~\ref{bugProg:tcpWaitForEventsPost}, a \fin segment is sent, which does not modify the state of the socket. Finally, at line~\ref{bugProg:tcpChangeState} the code tries to move the connection to the \sfwone state, and thus, the transitions $\text{\sclosew} \rightarrow \text{\sfwone}$ and $\text{\sclosed} \rightarrow \text{\sfwone}$ are possible.
 These transitions are not allowed by RFC 793, and thus, not allowed by the precondition of \spark{TCP_Change_State}, which models all the transitions allowed by TCP specification. Thus GNATprove reported an unproved precondition check here.
+
+\section{Results}
+
+In total, for this work, 50 functions have been translated from C to SPARK. This accounts for 2266 lines of code, of which 1165 are SPARK logic code (e.g.\ contracts) used to represent and prove TCP specification. All the socket functions and the user functions of TCP have been translated and proved in SPARK, then in particular \spark{TCP_Init}, \spark{TCP_Connect}, \spark{TCP_Listen}, \spark{TCP_Send}, \spark{TCP_Receive}, \spark{TCP_Shutdown}, \spark{TCP_Accept} and \spark{TCP_Abort}. The corresponding socket function that makes the interface between Socket function have also been fully translated to SPARK.
+At the end, 25\% of the functions that implement the TCP protocol have been rewritten in SPARK.
+
+The overall proving time with GNATprove from the Community 2021 release is 10 minutes on a 12-processor Intel(R) Core(TM) i7-9750H CPU with 2.60GHz speed and 16GB of RAM.
+
+% I'll try to add comparison between the time taken by the C and the Ada code.
 
 \section{Conclusion and future work}
 
