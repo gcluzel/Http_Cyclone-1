@@ -280,7 +280,7 @@ particular event that is requested by a TCP user function.}
 Essentially, the function \spark{TCP_Wait_For_Events} releases the mutex to allow for required events to happen. The function \spark{TCP_Update_Events} detects that the event's expected outcome is completed by monitoring the changes to the TCP states. Then it updates the specified event to be true in the socket structure, and it raises the desired event to allow resuming the TCP user function that requested the event in the first place. Thus, the \spark{TCP_Update_Events} function is called when a segment is being received and a state change took place. This makes the \spark{TCP_Update_Events} function a perfect candidate to introduce contracts in SPARK and model the possible states after the completion of each event.
 
 To model any possible state changes upon the reception of a segment in SPARK, the function \spark{TCP_Process_One_Segment} is introduced.
-The behavior of \spark{TCP_Wait_For_Events} is modeled by the ghost function \spark{TCP_Wait_For_Events_Proof} shown in \Cref{algo:waitForEvents}. It computes the set of possible final states after the completion of an event by calling repeatedly the function \spark{TCP_Process_One_Segment}. Both functions have the same behavior, and thus, the contract of the function \spark{TCP_Wait_For_Events_Proof} is also attached to \spark{TCP_Wait_For_Events}. This ghost function is proved automatically without even requiring a loop invariant, thanks to loop unrolling in GNATprove.
+The behavior of \spark{TCP_Wait_For_Events} is modeled by the ghost function \spark{TCP_Wait_For_Events_Proof} shown in \Cref{algo:waitForEvents}. It computes the set of possible final states after the completion of an event by calling repeatedly the function \spark{TCP_Process_One_Segment}. It is enough to perform only three iterations in the loop of this algorithm because the maximum path between two states that does not require a user interaction has a size of three. Both functions have the same behavior, and thus, the contract of the function \spark{TCP_Wait_For_Events_Proof} is also attached to \spark{TCP_Wait_For_Events}. This ghost function is proved automatically without even requiring a loop invariant, thanks to loop unrolling in GNATprove.
 
 
 \subsection{Symbolic execution to extract contracts}
@@ -307,9 +307,9 @@ tcpProcessSegment(sock, segment); (*@\label{code:kleedriver:tcpProcessSegment}@*
 // Check the expected postcondition
 klee_assert( (*@\label{code:kleedriver:assert}@*)
     (oldSock.state == TCP_STATE_ESTABLISHED) ?
-        sock.state == TCP_STATE_ESTABLISHED ||
-        sock.state == TCP_STATE_CLOSE_WAIT ||
-        sock.state == TCP_STATE_CLOSED :
+        sock->state == TCP_STATE_ESTABLISHED ||
+        sock->state == TCP_STATE_CLOSE_WAIT ||
+        sock->state == TCP_STATE_CLOSED :
     (oldSock.state == ...) ? ... )
 )
 \end{lstlisting}
