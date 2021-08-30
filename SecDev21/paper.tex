@@ -318,7 +318,7 @@ with KLEE}
 
 Symbolic execution is used to verify that all the possible paths when executing the \spark{tcpProcessSegment} function will result in a state that respects the RFC 793 extracted specifications. This process requires three steps shown in \Cref{code:kleedriver}. Firstly, a symbolic incoming segment is created, allowing to account for all possible incoming segments (see lines 1-4). Then at \cref{code:kleedriver:tcpProcessSegment}, function \texttt{tcpProcessSegment} is executed symbolically by KLEE. Finally, the assertion, \texttt{klee\_assert}, at \cref{code:kleedriver:assert} checks if the code leads to a valid state, one that is within the TCP specification. If there is no raised assertion, then the contract represented by the assertion is deemed proved, and the relevant C code respects the TCP specification regarding that contract. The assertion is then manually converted to a SPARK contract and added to the function \spark{TCP_Process_One_Segment}. This enables the SPARK prover to reason about the possible side-effects caused by the C code on the state of a TCP connection and thus, enables the functional correctness verification of the TCP user functions.
 
-Using KLEE on the function that process incoming segments helped us to make faster the verification of the user function. Applied to the user function, this method would not have been enough. KLEE can only unroll loops when the loops present in the user functions can finish after a high number of iterations which may leads to a combinatorial explosion in the number of paths explored by KLEE. KLEE has other limitations that were useful in SPARK for our verification like the detection of memory leaks.
+Our choice of combining deductive verification with SPARK and symbolic execution with KLEE was driven by practical considerations which are typical of industrial applications. Using KLEE on user functions would be difficult due to the presence of loops with a possible high number of iterations, which symbolic execution will need to unroll, leading to combinatorial explosion. Using SPARK on the function that processes incoming segments would be desirable, and may be done in the future, but was not doable in the timeframe of this project. Note that KLEE has other limitations compared to SPARK in terms of the verification scope. For example it is lacking a detection of memory leaks, which turned out to be useful in SPARK, see section~\ref{sec:memory-leak}.
 
 \section{Hardening the user's API}
 \label{sec:API}
@@ -378,6 +378,7 @@ In the above scenario, the postcondition of \spark{Socket_Connect} specifies tha
 As a result of this work, two bugs were detected and reported to the authors of
 CycloneTCP, and they fixed them in the C implementation.
 
+\label{sec:memory-leak}
 \subsubsection{Memory leak}
 
 A memory leak was detected thanks to the pointer ownership policy of SPARK
@@ -439,7 +440,7 @@ These transitions are not allowed by RFC 793, and thus, not allowed by the preco
 
 \section{Results}
 
-In total, for this work, 50 functions have been translated from C to SPARK. This accounts for 2266 lines of code, of which 1165 are SPARK logic code (e.g.\ contracts) used to represent and prove the TCP specification. All the socket functions and the user functions of TCP have been translated and proved in SPARK, in particular \spark{TCP_Init}, \spark{TCP_Connect}, \spark{TCP_Listen}, \spark{TCP_Send}, \spark{TCP_Receive}, \spark{TCP_Shutdown}, \spark{TCP_Accept} and \spark{TCP_Abort}. The corresponding socket function that makes the interface between Socket function have also been fully translated to SPARK.
+In total, for this work, 50 functions have been translated from C to SPARK. This accounts for 2266 lines of code, of which 1165 are SPARK logic code (e.g.\ contracts) used to represent and prove the TCP specification. All the socket functions and the user functions of TCP have been translated and proved in SPARK, in particular \spark{TCP_Init}, \spark{TCP_Connect}, \spark{TCP_Listen}, \spark{TCP_Send}, \spark{TCP_Receive}, \spark{TCP_Shutdown}, \spark{TCP_Accept} and \spark{TCP_Abort}. The corresponding socket functions from the Socket interface have also been fully translated to SPARK.
 At the end, 25\% of the functions that implement the TCP protocol have been rewritten in SPARK.
 
 The overall proving time with GNATprove from the Community 2021 release is 10 minutes on a 12-processor Intel(R) Core(TM) i7-9750H CPU with 2.60GHz speed and 16GB of RAM.
