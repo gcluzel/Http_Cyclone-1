@@ -448,17 +448,17 @@ These transitions are not allowed by RFC 793, and thus, not allowed by the preco
     \label{table:instr}
     \renewcommand{\arraystretch}{1.3}
     \centering
-    \begin{tabular}{lcc}
+    \begin{tabular}{lccc}
     \hline
-    \multirow{2}{*}{Function}&\multicolumn{2}{c}{Number of ASM instructions} \\
-    &C&SPARK\\ \hline
-    \spark{TCP_Listen}   & 18                  & 11                   \\
-    \spark{TCP_Accept}   & 153                 & 167                  \\
-    \spark{TCP_Connect}  & 103                 & 114                  \\
-    \spark{TCP_Send}     & 94                  & 124                  \\
-    \spark{TCP_Receive}  & 113                 & 153                  \\
-    \spark{TCP_Shutdown} & 107                 & 122                  \\
-    \spark{TCP_Abort}    & 42                  & 50                   \\ \hline
+    \multirow{2}{*}{Function}&\multicolumn{2}{c}{Number of ASM instructions}&\multirow{2}{*}{$\Delta$ num. of instr.} \\
+    &C&SPARK & \\ \hline
+    \spark{TCP_Listen}   & 18 & 11                   & $-$39\%\\
+    \spark{TCP_Accept}   & 153 & 167                  & +9\%\\
+    \spark{TCP_Connect}  & 103 & 114                  & +10\%\\
+    \spark{TCP_Send}     & 94 & 124                  & +31\%\\
+    \spark{TCP_Receive}  & 113 & 153                  & +35\%\\
+    \spark{TCP_Shutdown} & 107 & 122                  & +14\%\\
+    \spark{TCP_Abort}    & 42 & 50                   & +19\%\\ \hline
     \end{tabular}
 \end{table}
 
@@ -467,7 +467,7 @@ At the end, 25\% of the functions that implement the TCP protocol have been rewr
 
 The overall proving time with GNATprove from the Community 2021 release is 10 minutes on a 12-processor Intel(R) Core(TM) i7-9750H CPU with 2.60GHz speed and 16GB of RAM.
 
-Comparing the performance of each C and SPARK functions can be random and might not reflect the real time taken by the functions due to the network latency. Instead, we have reproduced in \Cref*{table:instr} the number of ARM assembly instructions of the TCP functions written in C and in SPARK. We observe that the C functions contain less instructions and then the performance of a C code using the TCP functions will be better than the performance of the same code written in SPARK.
+Comparing the performance of each C and SPARK functions can be random and might not reflect the real time taken by the functions due to the network latency. Instead, we have reproduced in \Cref*{table:instr} the number of ARM assembly instructions of the TCP functions written in C and in SPARK. Both C and SPARK code have been compiled with gcc by enabling the option \texttt{-Os} that performs many optimizations similar to \texttt{-O2} that do not increase the size of the generated code. We observe that the C functions contain less instructions and then the performance of a C code using the TCP functions will be better than the performance of the same code written in SPARK.
 
 \section{Conclusion and future work}
 
