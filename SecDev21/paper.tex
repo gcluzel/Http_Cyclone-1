@@ -10,6 +10,9 @@
 \definecolor{citecolor}{RGB}{17,122,101}
 \definecolor{urlcolor}{RGB}{148,39,38}
 
+\usepackage{multirow}
+\usepackage{array}
+
 \usepackage[
     colorlinks,
     linkcolor=linkcolor,
@@ -289,7 +292,7 @@ Symbolic execution is a means of executing programs with symbolic values rather 
 
 \begin{figure}
 \begin{lstlisting}[language=C, basicstyle=\footnotesize\ttfamily, numbers=left,
-    numberstyle=\tiny, frame=bottomline, escapeinside={(*@}{@*)}]
+    numberstyle=\tiny, frame=bottomline, escapeinside={(*@}{@*)}, numbersep=2pt]
 // Create a fake incoming segment
 TCPheader *segment = malloc(sizeof(TCPheader));
 klee_make_symbolic(segment, sizeof(segment), "seg");
@@ -440,12 +443,31 @@ These transitions are not allowed by RFC 793, and thus, not allowed by the preco
 
 \section{Results}
 
+\begin{table}[!t]
+    \caption{Comparison of the number of ASM instructions between the C and the SPARK implementation}
+    \label{table:instr}
+    \renewcommand{\arraystretch}{1.3}
+    \centering
+    \begin{tabular}{lcc}
+    \hline
+    \multirow{2}{*}{Function}&\multicolumn{2}{c}{Number of ASM instructions} \\
+    &C&SPARK\\ \hline
+    \spark{TCP_Listen}   & 18                  & 11                   \\
+    \spark{TCP_Accept}   & 153                 & 167                  \\
+    \spark{TCP_Connect}  & 103                 & 114                  \\
+    \spark{TCP_Send}     & 94                  & 124                  \\
+    \spark{TCP_Receive}  & 113                 & 153                  \\
+    \spark{TCP_Shutdown} & 107                 & 122                  \\
+    \spark{TCP_Abort}    & 42                  & 50                   \\ \hline
+    \end{tabular}
+\end{table}
+
 In total, for this work, 50 functions have been translated from C to SPARK. This accounts for 2266 lines of code, of which 1165 are SPARK logic code (e.g.\ contracts) used to represent and prove the TCP specification. All the socket functions and the user functions of TCP have been translated and proved in SPARK, in particular \spark{TCP_Init}, \spark{TCP_Connect}, \spark{TCP_Listen}, \spark{TCP_Send}, \spark{TCP_Receive}, \spark{TCP_Shutdown}, \spark{TCP_Accept} and \spark{TCP_Abort}. The corresponding socket functions from the Socket interface have also been fully translated to SPARK.
 At the end, 25\% of the functions that implement the TCP protocol have been rewritten in SPARK.
 
 The overall proving time with GNATprove from the Community 2021 release is 10 minutes on a 12-processor Intel(R) Core(TM) i7-9750H CPU with 2.60GHz speed and 16GB of RAM.
 
-% I'll try to add comparison between the time taken by the C and the Ada code.
+Comparing the performance of each C and SPARK functions can be random and might not reflect the real time taken by the functions due to the network latency. Instead, we have reproduced in \Cref*{table:instr} the number of ARM assembly instructions of the TCP functions written in C and in SPARK. We observe that the C functions contain less instructions and then the performance of a C code using the TCP functions will be better than the performance of the same code written in SPARK.
 
 \section{Conclusion and future work}
 
