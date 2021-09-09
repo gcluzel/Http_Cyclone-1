@@ -115,11 +115,11 @@ Networking communication models define the processes of transferring information
 
 \input{OryxStack.tex}
 
-Existing research has dealt with formally verifying several protocols of the TCP/IP stack. Early work formalized and proved some key properties of the TCP protocol~\cite{smith1996formal}. More recently, researchers have formally specified TCP, UDP and the Sockets API in HOL and tested existing libraries against the formal specification~\cite{tcp2005sigcomm,ridge2008rigorous}. Others have formally specified and implemented the SSL/TLS protocol in F* and integrated the resulting implementation in existing libraries~\cite{bhargavan2013implementing}. To the best of our knowledge, no prior work attempted to formally verify an implementation of TCP, although the authors of~\cite{ridge2008rigorous} suggest that it would possible to extract an actual implementation in Haskell from their specification.
+Existing research has dealt with formally verifying several protocols of the TCP/IP stack. Early work formalized and proved some key properties of the TCP protocol~\cite{smith1996formal}. In later work, researchers have formally specified TCP, UDP and the Sockets API in HOL and tested existing libraries against the formal specification~\cite{tcp2005sigcomm,ridge2008rigorous}. More recently, others have formally specified and implemented the SSL/TLS protocol in F* and integrated the resulting implementation in existing libraries~\cite{bhargavan2013implementing}. To the best of our knowledge, no prior work attempted to formally verify an implementation of TCP, although the authors of~\cite{ridge2008rigorous} suggest that it would possible to extract an actual implementation in Haskell from their specification.
 
-In this paper, we take a practical approach, where the security of an existing TCP/IP stack implementation written in the C programming language is incrementally enhanced by replacing parts of its code with formally verified code in SPARK~\cite{mccormick_chapin_2015}, a subset of the Ada programming language supported by formal verification tools. We chose CycloneTCP, a professional-grade open source embedded TCP/IP library developed by the Oryx Embedded company~\cite{CycloneTCP}. \Cref{Fig:TcpStack} shows the protocols supported by the library. This work focuses on the TCP and Socket components of the stack. The library's TCP implementation is meant to conform to the RFC 793 protocol specifications~\cite{rfc793}. The quality of the CycloneTCP is acknowledged by the AMNESIA:33 report~\cite{AMNESIA33}, which classifies it as one of the most resilient TCP/IP stacks.
+In this paper, we take a practical approach, where the security of an existing TCP/IP stack implementation written in the C programming language is incrementally enhanced by replacing parts of its code with formally verified code in SPARK~\cite{mccormick_chapin_2015}, a subset of the Ada programming language supported by formal verification tools. We chose CycloneTCP, a professional-grade open source embedded TCP/IP library developed by the Oryx Embedded company~\cite{CycloneTCP}. \Cref{Fig:TcpStack} shows the protocols supported by the library. This work focuses on the TCP and Socket components of the stack. The library's TCP implementation is meant to conform to the RFC 793 protocol specifications~\cite{rfc793}. The quality of CycloneTCP is acknowledged by the AMNESIA:33 report~\cite{AMNESIA33}, which classifies it as one of the most resilient TCP/IP stacks.
 
-The contributions of this article are the following. First, we show that formal verification can be applied selectively to a layer of an existing TCP/IP library, by translating the TCP layer to SPARK and modelling the lower layers on which it depends. The benefits are three-fold: we found and corrected two bugs in the TCP layer, we proved the correction of that layer, and we defined formal contracts for the upper layers to call the TCP layer. Second, we showed how the models of the lower layers can be validated by symbolic execution with KLEE on the C code of those layers. The tools and code\footnote{\url{https://github.com/Adacore/Http_Cyclone}} are freely available online.
+The contributions of this article are the following. First, we show that formal verification can be applied selectively to a layer of an existing TCP/IP library, by translating the TCP layer to SPARK and modelling the lower layers on which it depends. The benefits are three-fold: we found and corrected two bugs in the TCP layer, we proved the correction of that layer, and we defined formal contracts for the upper layers to call the TCP layer. Second, we showed how the models of the lower layers can be validated by symbolic execution with KLEE on the C code of those layers. The tools\footnote{\url{https://www.adacore.com/download}} and code\footnote{\url{https://github.com/Adacore/Http_Cyclone}} are freely available online.
 
 We present the TCP protocol in section~\ref{sec:TCP} and the specification
 techniques used in section~\ref{sec:spec}. We explain how we formally
@@ -281,14 +281,14 @@ particular event that is requested by a TCP user function.}
 Essentially, the function \spark{TCP_Wait_For_Events} releases the mutex to allow for required events to happen. The function \spark{TCP_Update_Events} detects that the event's expected outcome is completed by monitoring the changes to the TCP states. Then it updates the specified event to be true in the socket structure, and it raises the desired event to allow resuming the TCP user function that requested the event in the first place. Thus, the \spark{TCP_Update_Events} function is called when a segment is being received and a state change took place. This makes the \spark{TCP_Update_Events} function a perfect candidate to introduce contracts in SPARK and model the possible states after the completion of each event.
 
 To model any possible state changes upon the reception of a segment in SPARK, the function \spark{TCP_Process_One_Segment} is introduced.
-The behavior of \spark{TCP_Wait_For_Events} is modeled by the ghost function \spark{TCP_Wait_For_Events_Proof} shown in \Cref{algo:waitForEvents}. It computes the set of possible final states after the completion of an event by calling repeatedly the function \spark{TCP_Process_One_Segment}. It is enough to perform only three iterations in the loop of this algorithm because the maximum path between two states that does not require a user interaction has a size of three. Both functions have the same behavior, and thus, the contract of the function \spark{TCP_Wait_For_Events_Proof} is also attached to \spark{TCP_Wait_For_Events}. This ghost function is proved automatically without even requiring a loop invariant, thanks to loop unrolling in GNATprove.
+The behavior of \spark{TCP_Wait_For_Events} is modeled by the ghost function \spark{TCP_Wait_For_Events_Proof} shown in \Cref{algo:waitForEvents}. It computes the set of possible final states after the completion of an event by calling repeatedly the function \spark{TCP_Process_One_Segment}. It is enough to perform only three iterations in the loop of this algorithm because the maximum path between two states from the TCP automaton, given in \Cref{Fig:statemachine}, that does not require a user interaction has a size of three. Both functions have the same behavior, and thus, the contract of the function \spark{TCP_Wait_For_Events_Proof} is also attached to \spark{TCP_Wait_For_Events}. This ghost function is proved automatically without even requiring a loop invariant, thanks to loop unrolling in GNATprove.
 
 
 \subsection{Symbolic execution to extract contracts}
 
 The soundness of our verification requires all the contracts to be complete and correct; all the possible state transitions of a TCP connection must be modeled and proved.  In particular, this is true for the contract of \spark{TCP_Process_One_Segment} that is used to prove the function \spark{TCP_Wait_For_Events}, as it models calls to parts of the library in C that are not proved. To overcome this issue, symbolic execution was used on the original CycloneTCP C code to exhaustively verify any contracts related to transitions triggered from the C parts of the library.
 
-Symbolic execution is a means of executing programs with symbolic values rather than concrete values \cite{symbolic_exec_survey:2018}. Exhaustive symbolic execution can be considered sound and complete (it prevents false negatives and false positives), and thus, it is complementary to formal verification. In \cite{vanoverberghe2008using}, the authors present how symbolic execution can be used to improve deductive verification, and in \cite{kassios2012comparing} the authors demonstrated the technique's value in inferring contracts. For our work, the KLEE v2.1 symbolic execution engine is used \cite{KLEE}. KLEE is built upon the LLVM optimizer's bytecode, and it offers a very simple yet powerful C interface.
+Symbolic execution is a means of executing programs with symbolic values rather than concrete values \cite{symbolic_exec_survey:2018}. Exhaustive symbolic execution can be considered sound and complete (it prevents false negatives and false positives), and thus, it is on par with deductive verification. In \cite{vanoverberghe2008using}, the authors present how symbolic execution can be used to improve deductive verification, and in \cite{kassios2012comparing} the authors demonstrated the technique's value in inferring contracts. For our work, the KLEE v2.1 symbolic execution engine is used \cite{KLEE}. KLEE is built upon the LLVM optimizer's bytecode, and it offers a very simple yet powerful C interface.
 
 \begin{figure}
 \begin{lstlisting}[language=C, basicstyle=\footnotesize\ttfamily, numbers=left,
@@ -342,11 +342,11 @@ procedure Socket_Connect
    with
    Pre => Is_Initialized_Ip (Remote_Ip_Addr),
    Post =>
-    if Sock.S_Type = SOCKET_TYPE_STREAM then
+    (if Sock.S_Type = SOCKET_TYPE_STREAM then
       (if Error = NO_ERROR then
         Sock.S_Remote_Ip_Addr = Remote_Ip_Addr)
     else
-      Sock.S_Remote_Ip_Addr = Remote_Ip_Addr
+      Sock.S_Remote_Ip_Addr = Remote_Ip_Addr)
 
 procedure Socket_Send
    (Sock    : in out Not_Null_Socket;
@@ -362,7 +362,7 @@ postconditions}
 \label{fig:functionorder}
 \end{figure}
 
-Simplified contracts extracted from our SPARK implementation are reproduced in \Cref{fig:functionorder}, to demonstrate how SPARK can be used to enforce the correct function calls' ordering. If no error occurs, the function \spark{Socket_Connect} sets \spark{Sock.S_Remote_Ip_Addr} to \spark{Remote_Ip_Addr} which is supposed to be initialized when the function is called. \spark{Socket_Send} requires being called with a not null socket such that its field \spark{Remote_Ip_Addr} is initialized. The only way to ensure that the precondition hold is to call \spark{Socket_Connect} before \spark{Socket_Send}. By analyzing the user's code, GNATprove will statically detect if a call to \spark{Socket_Send} is not preceded by a call to \spark{Socket_Connect}.
+Simplified contracts extracted from our SPARK implementation are reproduced in \Cref{fig:functionorder}, to demonstrate how SPARK can be used to enforce the correct function calls' ordering. If no error occurs, the function \spark{Socket_Connect} sets \spark{Sock.S_Remote_Ip_Addr} to \spark{Remote_Ip_Addr} which is supposed to be initialized when the function is called. \spark{Socket_Send} requires being called with a not null socket such that its field \spark{Remote_Ip_Addr} is initialized. The only way to ensure that the precondition holds is to call \spark{Socket_Connect} before \spark{Socket_Send}. By analyzing the user's code, GNATprove will statically detect if a call to \spark{Socket_Send} is not preceded by a call to \spark{Socket_Connect}.
 
 \subsection{Checking the correctness of return codes}
 
@@ -378,8 +378,7 @@ In the above scenario, the postcondition of \spark{Socket_Connect} specifies tha
 \section{Bugs Captured}
 \label{sec:results}
 
-As a result of this work, two bugs were detected and reported to the authors of
-CycloneTCP, and they fixed them in the C implementation.
+As a result of this work, two bugs were detected and reported to the fourth author of this article, also main developer of CycloneTCP, and were fixed in the C implementation.
 
 \label{sec:memory-leak}
 \subsubsection{Memory leak}
@@ -467,7 +466,7 @@ At the end, 25\% of the functions that implement the TCP protocol have been rewr
 
 The overall proving time with GNATprove from the Community 2021 release is 10 minutes on a 12-processor Intel(R) Core(TM) i7-9750H CPU with 2.60GHz speed and 16GB of RAM.
 
-Comparing the performance of each C and SPARK functions can be random and might not reflect the real time taken by the functions due to the network latency. Instead, we have reproduced in \Cref*{table:instr} the number of ARM assembly instructions of the TCP functions written in C and in SPARK. Both C and SPARK code have been compiled with gcc by enabling the option \texttt{-Os} that performs many optimizations similar to \texttt{-O2} that do not increase the size of the generated code. We observe that the C functions contain less instructions and then the performance of a C code using the TCP functions will be better than the performance of the same code written in SPARK.
+Comparing the performance of C and SPARK functions can be very volatile and might not reflect the real time taken by the functions due to network latency. Instead, we have reproduced in \Cref*{table:instr} the number of ARM assembly instructions of the TCP functions written in C and in SPARK. Both C and SPARK code have been compiled with GCC by enabling the option \texttt{-Os} that performs many optimizations similar to \texttt{-O2} that do not increase the size of the generated code. We observe that the C functions contain fewer instructions than their SPARK counterparts, hence it is expected that their runtime performance will be better. However, we don't expect this to be of practical significance, given the modest amount of time that an application will spend running these functions.
 
 \section{Conclusion and future work}
 
